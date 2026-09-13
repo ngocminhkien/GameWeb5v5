@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Top-Down 5v5 MOBA (Kiến Trúc Modular & Địa Hình Đối Xứng Hoàn Hảo)</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+    body {
+      background: #06090e;
+      color: #e6edf3;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    #header {
+      background: rgba(13, 17, 23, 0.95);
+      border-bottom: 1px solid #30363d;
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      z-index: 10;
+    }
+    .title-box h1 {
+      font-size: 15px;
+      font-weight: 700;
+      color: #58a6ff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .badge {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 12px;
+      background: #238636;
+      color: #fff;
+    }
+    .badge-modular {
+      background: #8957e5;
+      font-weight: 800;
+    }
+    .controls-bar {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .btn {
+      background: #21262d;
+      border: 1px solid #363b42;
+      color: #c9d1d9;
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn:hover {
+      background: #30363d;
+      border-color: #8b949e;
+      color: #fff;
+    }
+    .btn.active {
+      background: #1f6feb;
+      border-color: #388bfd;
+      color: #fff;
+    }
+    .btn-cam-locked {
+      background: rgba(35, 134, 54, 0.25);
+      border-color: #238636;
+      color: #3fb950;
+    }
+    .btn-cam-unlocked {
+      background: rgba(210, 153, 34, 0.25);
+      border-color: #d29922;
+      color: #e3b341;
+    }
+    .zoom-indicator {
+      font-size: 12px;
+      color: #8b949e;
+      background: #161b22;
+      padding: 5px 10px;
+      border-radius: 6px;
+      border: 1px solid #30363d;
+    }
+    #game-container {
+      position: relative;
+      flex: 1;
+      width: 100%;
+      height: 100%;
+      cursor: crosshair;
+    }
+    canvas#gameCanvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    .edge-indicator {
+      position: absolute;
+      pointer-events: none;
+      background: rgba(88, 166, 255, 0.18);
+      transition: opacity 0.15s;
+      opacity: 0;
+    }
+    #edge-top { top: 0; left: 0; right: 0; height: 18px; }
+    #edge-bottom { bottom: 0; left: 0; right: 0; height: 18px; }
+    #edge-left { top: 0; left: 0; bottom: 0; width: 18px; }
+    #edge-right { top: 0; right: 0; bottom: 0; width: 18px; }
+
+    #hud {
+      position: absolute;
+      bottom: 15px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: rgba(13, 17, 23, 0.94);
+      backdrop-filter: blur(8px);
+      padding: 10px 16px;
+      border-radius: 12px;
+      border: 1px solid rgba(88, 166, 255, 0.28);
+      pointer-events: auto;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7);
+    }
+    #hud-top-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+    .level-badge {
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      color: #000;
+      font-weight: 800;
+      font-size: 12px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      box-shadow: 0 0 8px rgba(245, 158, 11, 0.4);
+      white-space: nowrap;
+    }
+    .exp-bar-box {
+      flex: 1;
+      height: 16px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 180px;
+    }
+    .exp-bar-fill {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      background: linear-gradient(90deg, #8957e5, #388bfd);
+      width: 0%;
+      transition: width 0.25s ease-out;
+    }
+    .exp-bar-text {
+      position: relative;
+      z-index: 2;
+      font-size: 10px;
+      font-weight: 700;
+      color: #f0f6fc;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+      user-select: none;
+    }
+    .gold-badge {
+      font-size: 13px;
+      font-weight: 800;
+      color: #ffd700;
+      text-shadow: 0 0 6px rgba(255, 215, 0, 0.4);
+      white-space: nowrap;
+    }
+    #hud-skills-row {
+      display: flex;
+      gap: 12px;
+      align-items: flex-end;
+    }
+    .skill-slot {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+    }
+    .btn-upgrade-skill {
+      width: 26px;
+      height: 18px;
+      border-radius: 4px;
+      background: #d29922;
+      border: 1px solid #ffd700;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 900;
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.15s;
+      animation: pulseUpgrade 1s infinite alternate;
+      line-height: 1;
+      padding: 0;
+    }
+    @keyframes pulseUpgrade {
+      from { transform: scale(1); box-shadow: 0 0 4px #ffd700; }
+      to { transform: scale(1.15); box-shadow: 0 0 10px #ffd700; }
+    }
+    .btn-upgrade-skill:hover {
+      background: #e3b341;
+      transform: scale(1.25);
+    }
+    .btn-upgrade-placeholder {
+      height: 18px;
+      width: 26px;
+    }
+    .skill-icon {
+      width: 46px;
+      height: 46px;
+      border-radius: 8px;
+      background: #161b22;
+      border: 2px solid #30363d;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 14px;
+      color: #58a6ff;
+      position: relative;
+      overflow: hidden;
+    }
+    .skill-cd {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.78);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      color: #f85149;
+    }
+    .skill-lock {
+      position: absolute;
+      inset: 0;
+      background: rgba(10, 15, 22, 0.85);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      color: #8b949e;
+    }
+    .skill-pips {
+      display: flex;
+      gap: 4px;
+      margin-top: 2px;
+    }
+    .pip {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #21262d;
+      border: 1px solid #30363d;
+    }
+    .pip.active {
+      background: #ffd700;
+      border-color: #f59e0b;
+      box-shadow: 0 0 5px #ffd700;
+    }
+    .skill-key {
+      font-size: 11px;
+      font-weight: 700;
+      color: #8b949e;
+    }
+    #legend-panel {
+      position: absolute;
+      top: 15px;
+      left: 15px;
+      background: rgba(13, 17, 23, 0.92);
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 12px;
+      line-height: 1.6;
+      max-width: 330px;
+      pointer-events: none;
+    }
+    #legend-panel strong {
+      color: #58a6ff;
+    }
+    .score-board {
+      position: absolute;
+      top: 15px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(22, 27, 34, 0.94);
+      border: 1px solid #30363d;
+      border-radius: 20px;
+      padding: 5px 24px;
+      font-weight: bold;
+      font-size: 15px;
+      display: flex;
+      gap: 16px;
+      pointer-events: none;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.6);
+    }
+    .blue-score { color: #58a6ff; }
+    .red-score { color: #f85149; }
+    #announcement {
+      position: absolute;
+      top: 70px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 19px;
+      font-weight: bold;
+      color: #f0883e;
+      background: rgba(13, 17, 23, 0.9);
+      padding: 6px 20px;
+      border-radius: 8px;
+      border: 1px solid rgba(240, 136, 62, 0.35);
+      text-shadow: 0 0 10px rgba(0,0,0,0.8);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.25s;
+    }
+
+    /* MINIMAP (VUÔNG 1:1 CHỮ X ĐỐI XỨNG HOÀN HẢO) */
+    #minimap-wrapper {
+      position: absolute;
+      bottom: 15px;
+      right: 15px;
+      width: 220px;
+      height: 220px;
+      background: rgba(7, 10, 15, 0.96);
+      border: 2px solid #58a6ff;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.85);
+      cursor: crosshair;
+    }
+    #minimapCanvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    .minimap-tag {
+      position: absolute;
+      top: 4px;
+      left: 6px;
+      font-size: 10px;
+      font-weight: 800;
+      color: #a371f7;
+      pointer-events: none;
+      background: rgba(13, 17, 23, 0.8);
+      padding: 1px 6px;
+      border-radius: 4px;
+      border: 1px solid rgba(163, 113, 247, 0.3);
+    }
+  </style>
+</head>
+<body>
+
+  <div id="header">
+    <div class="title-box">
+      <h1>Top-Down 5v5 MOBA <span class="badge badge-modular">MODULAR ARCHITECTURE</span></h1>
+    </div>
+    <div class="controls-bar">
+      <span class="zoom-indicator" id="zoom-label">🔍 Zoom 0.85x (Cuộn chuột)</span>
+      <button class="btn btn-cam-locked" id="btn-camera">
+        📷 [Y] Khóa Camera: BẬT
+      </button>
+      <button class="btn active" id="btn-pve">⚔️ 5v5 PvE (Co-op vs 5 Bot)</button>
+      <button class="btn" id="btn-solo">🎯 1v1 Thử Nghiệm AI</button>
+      <button class="btn" id="btn-reset">🔄 Reset Trận Đấu</button>
+    </div>
+  </div>
+
+  <div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+
+    <div class="edge-indicator" id="edge-top"></div>
+    <div class="edge-indicator" id="edge-bottom"></div>
+    <div class="edge-indicator" id="edge-left"></div>
+    <div class="edge-indicator" id="edge-right"></div>
+
+    <div class="score-board">
+      <span class="blue-score" id="blue-kills">Đội Xanh: 0</span>
+      <span id="match-timer" style="color: #f0883e; margin: 0 10px; font-variant-numeric: tabular-nums;">⏱️ 00:00</span>
+      <span class="red-score" id="red-kills">Đội Đỏ (Bot): 0</span>
+    </div>
+
+    <div id="announcement"></div>
+
+    <div id="legend-panel">
+      <strong>🎯 KIẾN TRÚC MODULAR MỚI:</strong><br>
+      • <strong>2 Đường Chéo Đối Xứng:</strong> Sông và Đường Giữa giao nhau chính xác 100% tại tâm (7500, 7500)<br>
+      • <strong>🏰 14 Trụ Phòng Thủ:</strong> Khóa tia laser & bắn đạn tự động khi kẻ địch vào tầm<br>
+      • <strong>🌿 Bụi Cỏ & ⛰️ Vách Đá:</strong> Ẩn nấp mờ ảo, cản đường chuẩn xác<br>
+      • <strong>🐉 Hang Rồng & 👑 Hang Baron:</strong> Nằm đối xứng 2 bên bờ sông<br>
+      <hr style="border: 0; border-top: 1px solid #30363d; margin: 6px 0;">
+      • <strong>Phím [Y]:</strong> Khóa/Mở camera | <strong>Cuộn chuột:</strong> Zoom<br>
+      • <strong>Chuột Phải:</strong> Di chuyển | <strong>Chuột Trái / [Q]:</strong> Bắn chiêu
+    </div>
+
+    <div id="hud">
+      <div id="hud-top-bar">
+        <div class="level-badge" id="hero-level-badge">LV 1</div>
+        <div class="exp-bar-box">
+          <div class="exp-bar-fill" id="exp-fill" style="width: 0%;"></div>
+          <span class="exp-bar-text" id="exp-text">EXP: 0 / 240 (0%)</span>
+        </div>
+        <div class="gold-badge" id="gold-badge">💰 <span id="gold-count">500</span></div>
+      </div>
+
+      <div id="hud-skills-row">
+        <!-- Q -->
+        <div class="skill-slot">
+          <button class="btn-upgrade-skill" id="btn-up-q" title="Nâng cấp [Ctrl+Q]">+</button>
+          <div class="skill-icon" id="skill-q-icon">
+            Q
+            <div class="skill-cd" id="cd-q" style="display: none;">0</div>
+            <div class="skill-lock" id="lock-q">🔒</div>
+          </div>
+          <div class="skill-pips" id="pips-q">
+            <span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span>
+          </div>
+          <span class="skill-key">Đạn Năng Lượng</span>
+        </div>
+
+        <!-- W -->
+        <div class="skill-slot">
+          <button class="btn-upgrade-skill" id="btn-up-w" title="Nâng cấp [Ctrl+W]">+</button>
+          <div class="skill-icon" id="skill-w-icon">
+            W
+            <div class="skill-cd" id="cd-w" style="display: none;">0</div>
+            <div class="skill-lock" id="lock-w">🔒</div>
+          </div>
+          <div class="skill-pips" id="pips-w">
+            <span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span>
+          </div>
+          <span class="skill-key">Hộ Thể</span>
+        </div>
+
+        <!-- E -->
+        <div class="skill-slot">
+          <button class="btn-upgrade-skill" id="btn-up-e" title="Nâng cấp [Ctrl+E]">+</button>
+          <div class="skill-icon" id="skill-e-icon">
+            E
+            <div class="skill-cd" id="cd-e" style="display: none;">0</div>
+            <div class="skill-lock" id="lock-e">🔒</div>
+          </div>
+          <div class="skill-pips" id="pips-e">
+            <span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span>
+          </div>
+          <span class="skill-key">Tốc Biến</span>
+        </div>
+
+        <!-- R -->
+        <div class="skill-slot">
+          <button class="btn-upgrade-skill" id="btn-up-r" title="Nâng cấp [Ctrl+R]">+</button>
+          <div class="skill-icon" id="skill-r-icon">
+            R
+            <div class="skill-cd" id="cd-r" style="display: none;">0</div>
+            <div class="skill-lock" id="lock-r">🔒</div>
+          </div>
+          <div class="skill-pips" id="pips-r">
+            <span class="pip"></span><span class="pip"></span><span class="pip"></span>
+          </div>
+          <span class="skill-key">Thiên Phạt</span>
+        </div>
+
+        <!-- B -->
+        <div class="skill-slot">
+          <div class="btn-upgrade-placeholder"></div>
+          <div class="skill-icon" id="skill-b-icon">
+            B
+            <div class="skill-cd" id="cd-b" style="display: none;">0</div>
+          </div>
+          <div class="skill-pips" style="visibility: hidden;">
+            <span class="pip"></span>
+          </div>
+          <span class="skill-key">Về Tế Đàn</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="minimap-wrapper">
+      <div class="minimap-tag">MINIMAP 15000x15000</div>
+      <canvas id="minimapCanvas"></canvas>
+    </div>
+  </div>
+
+  <!-- NẠP ES MODULE CHÍNH -->
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
