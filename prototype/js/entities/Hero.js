@@ -1636,6 +1636,14 @@ class Hero extends Entity {
     if (this.garenWTimer > 0) this.garenWTimer = Math.max(0, this.garenWTimer - dt);
     if (this.garenSpinTimer > 0) this.garenSpinTimer = Math.max(0, this.garenSpinTimer - dt);
 
+    // Thời gian Vùng Tinh Tú (Lumina Cosmic Zone)
+    if (this.cosmicZone) {
+      this.cosmicZone.timer -= dt;
+      if (this.cosmicZone.timer <= 0) {
+        this.cosmicZone = null;
+      }
+    }
+
     // Nội tại Garen - Hồi phục ngoài giao tranh (2.5% Max HP/s sau 6s)
     if (this.championId === 'fighter') {
       this.outOfCombatTimer = (this.outOfCombatTimer || 0) + dt;

@@ -160,10 +160,10 @@ class Game {
       this.heroes.push(this.player);
 
       const blueAllies = [
-        { name: 'Đồng Minh (Tank - Malphite)', championId: 'tank', lane: 'TOP', symbol: '🗿', color: '#d29922', x: 1400, y: 12800, spellD: 'flash', spellF: 'heal' },
-        { name: 'Đồng Minh (Yasuo - Rừng)', championId: 'assassin', lane: 'JUNGLE', symbol: '⚔️', color: '#2ea043', x: 2200, y: 12800, spellD: 'flash', spellF: 'smite' },
+        { name: 'Đồng Minh (Garen - Đấu Sĩ)', championId: 'fighter', lane: 'TOP', symbol: '⚔️', color: '#388bfd', x: 1400, y: 12800, spellD: 'flash', spellF: 'heal' },
+        { name: 'Đồng Minh (Yasuo - Rừng)', championId: 'assassin', lane: 'JUNGLE', symbol: '🌪️', color: '#2ea043', x: 2200, y: 12800, spellD: 'flash', spellF: 'smite' },
         { name: 'Đồng Minh (ADC - Ashe)', championId: 'adc', lane: 'BOT', symbol: '🏹', color: '#58a6ff', x: 2400, y: 13600, spellD: 'flash', spellF: 'heal' },
-        { name: 'Đồng Minh (Valhein)', championId: 'mage', lane: 'BOT', symbol: '🔮', color: '#8957e5', x: 1600, y: 14000, spellD: 'flash', spellF: 'ignite' }
+        { name: 'Đồng Minh (Lumina - Hỗ Trợ)', championId: 'support', lane: 'BOT', symbol: '✨', color: '#ec4899', x: 1600, y: 14000, spellD: 'flash', spellF: 'heal' }
       ];
       blueAllies.forEach((a, i) => {
         const h = new Hero({
@@ -187,9 +187,9 @@ class Game {
       const redBots = [
         { name: 'Bot Đỏ (Tank - Malphite)', championId: 'tank', lane: 'TOP', symbol: '🗿', color: '#d29922', x: 13600, y: 2200, spellD: 'flash', spellF: 'heal' },
         { name: 'Bot Đỏ (Valhein - Mid)', championId: 'mage', lane: 'MID', symbol: '🔮', color: '#8957e5', x: 13200, y: 1800, spellD: 'flash', spellF: 'ignite' },
-        { name: 'Bot Đỏ (Yasuo - Rừng)', championId: 'assassin', lane: 'JUNGLE', symbol: '⚔️', color: '#2ea043', x: 12800, y: 2200, spellD: 'flash', spellF: 'smite' },
+        { name: 'Bot Đỏ (Yasuo - Rừng)', championId: 'assassin', lane: 'JUNGLE', symbol: '🌪️', color: '#2ea043', x: 12800, y: 2200, spellD: 'flash', spellF: 'smite' },
         { name: 'Bot Đỏ (ADC - Ashe)', championId: 'adc', lane: 'BOT', symbol: '🏹', color: '#58a6ff', x: 12600, y: 1400, spellD: 'flash', spellF: 'heal' },
-        { name: 'Bot Đỏ (Hỗ Trợ)', championId: 'tank', lane: 'BOT', symbol: '🛡️', color: '#da3633', x: 13400, y: 1000, spellD: 'flash', spellF: 'barrier' }
+        { name: 'Bot Đỏ (Lumina - Hỗ Trợ)', championId: 'support', lane: 'BOT', symbol: '✨', color: '#ec4899', x: 13400, y: 1000, spellD: 'flash', spellF: 'heal' }
       ];
       redBots.forEach((b, i) => {
         const h = new Hero({
@@ -677,6 +677,57 @@ class Game {
           }
         }
       }
+
+      // Garen E Judgment Spin Tick (every 0.5s)
+      if (h.alive && h.garenSpinTimer > 0) {
+        h.garenSpinTickTimer = (h.garenSpinTickTimer || 0) + dt;
+        if (h.garenSpinTickTimer >= 0.5) {
+          h.garenSpinTickTimer -= 0.5;
+          const spinRadius = 320;
+          const spinDmg = Math.round(h.attackDamage * 0.40 + 30);
+          for (let enemy of this.heroes) {
+            if (enemy.alive && enemy.team !== h.team && Math.hypot(enemy.x - h.x, enemy.y - h.y) <= spinRadius) {
+              enemy.takeDamage(spinDmg, h, this.hud.addFloatingText.bind(this.hud));
+              enemy.armor = Math.max(0, enemy.armor - 4);
+            }
+          }
+          for (let mn of this.minions) {
+            if (mn.alive && mn.team !== h.team && Math.hypot(mn.x - h.x, mn.y - h.y) <= spinRadius) {
+              mn.takeDamage(spinDmg, h, (deadMinion, killer) => {
+                this.onKillReward(deadMinion, killer);
+              });
+            }
+          }
+          for (let m of this.monsters) {
+            if (m.alive && Math.hypot(m.x - h.x, m.y - h.y) <= spinRadius) {
+              m.takeDamage(spinDmg, h, this.hud.addFloatingText.bind(this.hud));
+            }
+          }
+        }
+      }
+
+      // Lumina R Cosmic Zone Tick (every 0.5s)
+      if (h.alive && h.cosmicZone && h.cosmicZone.timer > 0) {
+        h.cosmicZone.tickTimer = (h.cosmicZone.tickTimer || 0) + dt;
+        if (h.cosmicZone.tickTimer >= 0.5) {
+          h.cosmicZone.tickTimer -= 0.5;
+          const zoneDmg = Math.round((h.abilityPower || 0) * 0.35 + 45);
+          const zoneHeal = Math.round((h.abilityPower || 0) * 0.20 + 35);
+          for (let enemy of this.heroes) {
+            if (enemy.alive && enemy.team !== h.team && Math.hypot(enemy.x - h.cosmicZone.x, enemy.y - h.cosmicZone.y) <= h.cosmicZone.radius) {
+              enemy.takeDamage(zoneDmg, h, this.hud.addFloatingText.bind(this.hud));
+              if (enemy.applySlow) enemy.applySlow(0.40, 0.6);
+              enemy.silenceTimer = Math.max(enemy.silenceTimer || 0, 0.6);
+            }
+          }
+          for (let ally of this.heroes) {
+            if (ally.alive && ally.team === h.team && Math.hypot(ally.x - h.cosmicZone.x, ally.y - h.cosmicZone.y) <= h.cosmicZone.radius) {
+              ally.hp = Math.min(ally.maxHp, ally.hp + zoneHeal);
+              this.hud.addFloatingText(`+${zoneHeal} HP ✨`, ally.x, ally.y - 35, '#ec4899');
+            }
+          }
+        }
+      }
     }
 
     // Update Heroes
@@ -820,6 +871,18 @@ class Game {
                 p.owner.recalculateStats();
               }
               this.hud.addFloatingText('🥌 ĐOẠT TỐC ĐỘ!', h.x, h.y - 40, '#f59e0b');
+            }
+            if (p.isStarOrb) {
+              h.stunTimer = 1.2;
+              this.hud.addFloatingText('🌟 CHOÁNG TINH TÚ (1.2s)!', h.x, h.y - 45, '#ec4899');
+              this.clickWaves.push({ x: h.x, y: h.y, r: 6, maxR: 35, color: '#ec4899', alpha: 1.0 });
+              for (let other of this.heroes) {
+                if (other !== h && other.alive && other.team !== p.team && Math.hypot(other.x - h.x, other.y - h.y) <= 300) {
+                  other.takeDamage(Math.round(p.damage * 0.75), p.owner, this.hud.addFloatingText.bind(this.hud));
+                  other.stunTimer = 0.8;
+                  this.hud.addFloatingText('🌟 CHOÁNG LAN!', other.x, other.y - 40, '#ec4899');
+                }
+              }
             }
 
             h.takeDamage(p.damage, p.owner, this.hud.addFloatingText.bind(this.hud));

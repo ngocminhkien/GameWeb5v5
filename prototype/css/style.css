@@ -1,4 +1,4 @@
-* {
+﻿* {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
@@ -1148,6 +1148,7 @@ canvas#gameCanvas {
   z-index: 120;
   overflow: hidden;
 }
+
 .champ-select-content {
   max-width: 980px !important;
   width: 94% !important;
@@ -1161,7 +1162,7 @@ canvas#gameCanvas {
 
 .champ-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
   gap: 12px;
   padding: 16px;
   overflow-y: auto;
@@ -1220,6 +1221,8 @@ canvas#gameCanvas {
 .badge-adc { background: rgba(56, 139, 253, 0.25); color: #79c0ff; border: 1px solid #388bfd; }
 .badge-assassin { background: rgba(46, 160, 67, 0.25); color: #56d364; border: 1px solid #2ea043; }
 .badge-tank { background: rgba(210, 153, 34, 0.25); color: #e3b341; border: 1px solid #d29922; }
+.badge-support { background: rgba(236, 72, 153, 0.25); color: #f472b6; border: 1px solid #ec4899; }
+.badge-fighter { background: rgba(31, 111, 235, 0.25); color: #79c0ff; border: 1px solid #1f6feb; }
 
 .champ-card-avatar {
   width: 58px;
@@ -1321,37 +1324,40 @@ canvas#gameCanvas {
 }
 
 /* HUD Buff Badges */
-.hud-buffs-container {
+#hud-buffs-container {
   display: flex;
   gap: 6px;
-  align-items: center;
-  margin-bottom: 4px;
+  position: absolute;
+  top: -36px;
+  left: 20px;
+  z-index: 20;
 }
 
 .hud-buff-badge {
   font-size: 11px;
   font-weight: 800;
-  padding: 2px 8px;
-  border-radius: 10px;
+  padding: 3px 8px;
+  border-radius: 4px;
   letter-spacing: 0.3px;
   user-select: none;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  animation: buffPulse 2.5s infinite ease-in-out;
 }
 
 .buff-dragon {
-  background: linear-gradient(135deg, rgba(248, 81, 73, 0.25), rgba(218, 54, 51, 0.35));
-  border: 1px solid #f85149;
-  color: #ffa198;
-  box-shadow: 0 0 8px rgba(248, 81, 73, 0.4);
+  background: linear-gradient(135deg, rgba(235, 87, 87, 0.35), rgba(242, 153, 74, 0.45));
+  border-color: #f2994a;
+  color: #ffdda1;
 }
 
 .buff-baron {
-  background: linear-gradient(135deg, rgba(163, 113, 247, 0.25), rgba(137, 87, 229, 0.35));
-  border: 1px solid #a371f7;
-  color: #d2a8ff;
-  box-shadow: 0 0 10px rgba(163, 113, 247, 0.5);
+  background: linear-gradient(135deg, rgba(142, 45, 226, 0.4), rgba(74, 0, 224, 0.5));
+  border-color: #a371f7;
+  color: #e0c3fc;
   animation: pulseBaron 1.5s infinite alternate;
 }
 
