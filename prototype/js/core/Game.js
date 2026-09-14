@@ -1053,7 +1053,7 @@ class Game {
     ctx.translate(-cx, -cy);
 
     // 1. Terrain
-    this.terrain.draw(ctx, this.camera, this.canvas.width, this.canvas.height);
+    this.terrain.draw(ctx, this.camera, this.canvas.width, this.canvas.height, this.heroes);
 
     // 2. Fog of War
     const alliedVision = this.fogOfWar.getAlliedVisionSources(this.heroes, this.minions, this.towers);

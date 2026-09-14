@@ -77,6 +77,13 @@ class Minion extends Entity {
     this.baseRange = this.range;
     this.isBaronEmpowered = false;
     this.baronPulse = 0;
+
+    // Procedural Vector Animation States
+    this.animTime = Math.random() * 10;
+    this.facingAngle = this.team === 'blue' ? -Math.PI / 4 : (3 * Math.PI) / 4;
+    this.walkCycle = 0;
+    this.attackAnimDuration = 0.35;
+    this.attackAnimTimer = 0;
   }
 
   applyBaronBuff(empower) {
@@ -196,6 +203,10 @@ class Minion extends Entity {
     // 3. Movement or Attack
     if (this.target) {
       const dist = Math.hypot(this.target.x - this.x, this.target.y - this.y);
+      const dx = this.target.x - this.x;
+      const dy = this.target.y - this.y;
+      this.facingAngle = Math.atan2(dy, dx);
+
       if (dist <= this.range) {
         // Attack Target
         if (this.attackCooldown <= 0) {
@@ -204,8 +215,7 @@ class Minion extends Entity {
         }
       } else {
         // Move towards target
-        const dx = this.target.x - this.x;
-        const dy = this.target.y - this.y;
+        this.walkCycle += dt * 10;
         this.x += (dx / dist) * this.speed * dt;
         this.y += (dy / dist) * this.speed * dt;
       }
@@ -220,6 +230,8 @@ class Minion extends Entity {
         if (distToWp < 120) {
           this.waypointIdx++;
         } else {
+          this.facingAngle = Math.atan2(dy, dx);
+          this.walkCycle += dt * 10;
           this.x += (dx / distToWp) * this.speed * dt;
           this.y += (dy / distToWp) * this.speed * dt;
         }
@@ -229,6 +241,8 @@ class Minion extends Entity {
 
   performAttack(projectiles, onKill = null) {
     if (!this.target || !this.target.alive) return;
+
+    this.attackAnimTimer = this.attackAnimDuration;
 
     if (this.type === 'MELEE' || this.type === 'SUPER') {
       const wasAlive = this.target.alive;
@@ -257,6 +271,370 @@ class Minion extends Entity {
     }
   }
 
+  drawMeleeFrame(ctx, isBaron) {
+    const isBlue = this.team === 'blue';
+    const mainColor = isBlue ? '#1f6feb' : '#da3633';
+    const armorDark = isBlue ? '#0d419d' : '#82071e';
+    const trimColor = isBaron ? '#a371f7' : (isBlue ? '#58a6ff' : '#ff7b72');
+    const walkBob = Math.sin(this.walkCycle) * 2.5;
+    const legOffset = Math.sin(this.walkCycle) * 3.5;
+
+    // Ground Shadow
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.38)';
+    ctx.beginPath();
+    ctx.ellipse(0, 3, this.radius * 0.9, this.radius * 0.6, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Boots
+    ctx.fillStyle = '#21262d';
+    ctx.fillRect(-5 + legOffset, 6, 5, 4);
+    ctx.fillRect(-5 - legOffset, -10, 5, 4);
+
+    // Torso / Plate Armor
+    ctx.fillStyle = armorDark;
+    ctx.beginPath();
+    ctx.roundRect(-8, -8 + walkBob * 0.3, 14, 16, 4);
+    ctx.fill();
+    ctx.strokeStyle = trimColor;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Heraldic Faction Tabard Stripe
+    ctx.fillStyle = mainColor;
+    ctx.fillRect(-4, -6 + walkBob * 0.3, 7, 12);
+
+    // Helmet with Visor Slit
+    ctx.fillStyle = '#30363d';
+    ctx.beginPath();
+    ctx.arc(0, 0 + walkBob * 0.4, 6.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#484f58';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Glowing Visor
+    ctx.fillStyle = isBaron ? '#d2a8ff' : (isBlue ? '#79c0ff' : '#ffa198');
+    ctx.fillRect(2, -2 + walkBob * 0.4, 3, 4);
+
+    // Left Arm: Heraldic Shield (Kite Shield)
+    ctx.save();
+    ctx.translate(2, -11);
+    ctx.beginPath();
+    ctx.moveTo(-5, -4);
+    ctx.lineTo(7, -4);
+    ctx.lineTo(4, 7);
+    ctx.lineTo(-4, 4);
+    ctx.closePath();
+    ctx.fillStyle = armorDark;
+    ctx.fill();
+    ctx.strokeStyle = trimColor;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.restore();
+
+    // Right Arm: Broadsword with attack swing trail
+    const isAttacking = this.attackAnimTimer > 0;
+    const attackPhase = isAttacking ? 1 - (this.attackAnimTimer / this.attackAnimDuration) : 0;
+    const swordAngle = isAttacking ? (-0.6 + attackPhase * 1.8) : 0.2;
+
+    ctx.save();
+    ctx.translate(4, 9);
+    ctx.rotate(swordAngle);
+
+    // Sword Blade
+    ctx.fillStyle = '#c9d1d9';
+    ctx.beginPath();
+    ctx.moveTo(0, -2);
+    ctx.lineTo(15, -1);
+    ctx.lineTo(17, 0);
+    ctx.lineTo(15, 1);
+    ctx.lineTo(0, 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#8b949e';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Crossguard & Hilt
+    ctx.fillStyle = '#d29922';
+    ctx.fillRect(-2, -4, 3, 8);
+    ctx.fillStyle = '#6e7681';
+    ctx.fillRect(-4, -1, 3, 2);
+    ctx.restore();
+
+    // Slash Arc Trail during attack
+    if (isAttacking && attackPhase > 0.1 && attackPhase < 0.9) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(3, 0, 22, -0.6, -0.6 + attackPhase * 1.6);
+      ctx.strokeStyle = isBaron ? 'rgba(163, 113, 247, 0.7)' : (isBlue ? 'rgba(88, 166, 255, 0.7)' : 'rgba(255, 123, 114, 0.7)');
+      ctx.lineWidth = 3.5;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  drawRangedMinion(ctx, isBaron) {
+    const isBlue = this.team === 'blue';
+    const robeColor = isBlue ? '#112240' : '#3d0a14';
+    const cloakColor = isBlue ? '#1f6feb' : '#da3633';
+    const magicGlow = isBaron ? '#d2a8ff' : (isBlue ? '#79c0ff' : '#ffa198');
+    const walkBob = Math.sin(this.walkCycle) * 2;
+    const hemSway = Math.sin(this.walkCycle) * 3;
+
+    // Ground Shadow
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+    ctx.beginPath();
+    ctx.ellipse(0, 3, this.radius * 0.85, this.radius * 0.55, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Flowing Wizard Cloak / Robe
+    ctx.fillStyle = cloakColor;
+    ctx.beginPath();
+    ctx.moveTo(-9, -6);
+    ctx.lineTo(4, -8);
+    ctx.lineTo(4, 8);
+    ctx.lineTo(-9, 6);
+    ctx.quadraticCurveTo(-13 + hemSway, 0, -9, -6);
+    ctx.closePath();
+    ctx.fill();
+
+    // Robe Core
+    ctx.fillStyle = robeColor;
+    ctx.beginPath();
+    ctx.arc(-2, 0, 7.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Wizard Hood
+    ctx.fillStyle = robeColor;
+    ctx.beginPath();
+    ctx.arc(1, 0, 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = cloakColor;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Glowing Wizard Eyes
+    ctx.fillStyle = magicGlow;
+    ctx.beginPath();
+    ctx.arc(4, -2, 1.3, 0, Math.PI * 2);
+    ctx.arc(4, 2, 1.3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Magic Staff in hand
+    const isAttacking = this.attackAnimTimer > 0;
+    const attackPhase = isAttacking ? 1 - (this.attackAnimTimer / this.attackAnimDuration) : 0;
+    const staffThrust = isAttacking ? Math.sin(attackPhase * Math.PI) * 5 : 0;
+
+    ctx.save();
+    ctx.translate(4 + staffThrust, 8);
+
+    // Staff wooden/gold pole
+    ctx.fillStyle = '#8b5a2b';
+    ctx.fillRect(-7, -1.5, 18, 3);
+
+    // Staff Topper: Mystical Arcane Orb
+    const orbPulse = Math.sin(this.animTime * 6) * 1.2;
+    ctx.fillStyle = magicGlow;
+    ctx.shadowColor = magicGlow;
+    ctx.shadowBlur = isAttacking ? 12 : 5;
+    ctx.beginPath();
+    ctx.arc(12, 0, 3.5 + orbPulse + (isAttacking ? 2 : 0), 0, Math.PI * 2);
+    ctx.fill();
+
+    // Orbital ring around orb
+    ctx.strokeStyle = isBaron ? '#a371f7' : '#ffffff';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.ellipse(12, 0, 5.5, 2.5, this.animTime * 3, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  drawCannonMinion(ctx, isBaron) {
+    const isBlue = this.team === 'blue';
+    const mainColor = isBlue ? '#1f6feb' : '#da3633';
+    const coreGlow = isBaron ? '#a371f7' : (isBlue ? '#388bfd' : '#f85149');
+    const wheelRot = this.walkCycle * 0.8;
+
+    // Heavy Chassis Shadow
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+    ctx.beginPath();
+    ctx.ellipse(0, 4, this.radius * 1.1, this.radius * 0.75, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Left & Right Spiked Tread Wheels
+    const drawWheel = (y) => {
+      ctx.save();
+      ctx.translate(0, y);
+      ctx.fillStyle = '#21262d';
+      ctx.fillRect(-11, -3, 22, 6);
+      ctx.strokeStyle = '#484f58';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(-11, -3, 22, 6);
+      ctx.fillStyle = '#8b949e';
+      const spokeOffset = (wheelRot % 5);
+      for (let s = -9 + spokeOffset; s <= 9; s += 4.5) {
+        ctx.fillRect(s, -3.5, 2, 7);
+      }
+      ctx.restore();
+    };
+    drawWheel(-12);
+    drawWheel(12);
+
+    // Iron Carriage Chassis
+    ctx.fillStyle = '#161b22';
+    ctx.beginPath();
+    ctx.roundRect(-12, -10, 22, 20, 4);
+    ctx.fill();
+    ctx.strokeStyle = mainColor;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Hextech Reactor Core (Rear Deck)
+    const pulse = Math.sin(this.animTime * 4) * 0.25 + 0.75;
+    ctx.fillStyle = coreGlow;
+    ctx.globalAlpha = pulse;
+    ctx.beginPath();
+    ctx.arc(-5, 0, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1.0;
+
+    // Cannon Barrel with Recoil Animation
+    const isAttacking = this.attackAnimTimer > 0;
+    const attackPhase = isAttacking ? 1 - (this.attackAnimTimer / this.attackAnimDuration) : 0;
+    const recoil = isAttacking ? Math.sin(attackPhase * Math.PI) * 6 : 0;
+
+    ctx.save();
+    ctx.translate(-recoil, 0);
+
+    // Pivot mount
+    ctx.fillStyle = '#30363d';
+    ctx.beginPath();
+    ctx.arc(0, 0, 6, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Heavy Bronze/Iron Barrel
+    ctx.fillStyle = '#30363d';
+    ctx.fillRect(0, -4.5, 16, 9);
+    ctx.fillStyle = mainColor;
+    ctx.fillRect(3, -4, 4, 8);
+    // Reinforced muzzle ring
+    ctx.fillStyle = '#8b949e';
+    ctx.fillRect(15, -5.5, 3.5, 11);
+
+    ctx.restore();
+
+    // Muzzle Flash & Smoke Puff when firing
+    if (isAttacking && attackPhase < 0.4) {
+      ctx.save();
+      ctx.translate(20, 0);
+      ctx.fillStyle = '#ffcc00';
+      ctx.beginPath();
+      ctx.arc(0, 0, 6 * (1 - attackPhase / 0.4), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(200, 200, 200, 0.6)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(3, 0, 9 * (attackPhase / 0.4), 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  drawSuperMinion(ctx, isBaron) {
+    const isBlue = this.team === 'blue';
+    const mainColor = isBlue ? '#1f6feb' : '#da3633';
+    const trimColor = isBaron ? '#a371f7' : (isBlue ? '#58a6ff' : '#ff7b72');
+    const walkBob = Math.sin(this.walkCycle) * 3;
+    const legOffset = Math.sin(this.walkCycle) * 4.5;
+
+    // Massive Shadow
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.48)';
+    ctx.beginPath();
+    ctx.ellipse(0, 5, this.radius * 1.05, this.radius * 0.7, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Heavy Armored Greaves / Legs
+    ctx.fillStyle = '#21262d';
+    ctx.fillRect(-9 + legOffset, 11, 8, 6);
+    ctx.fillRect(-9 - legOffset, -17, 8, 6);
+
+    // Armored Torso / Golem Frame
+    ctx.fillStyle = '#161b22';
+    ctx.beginPath();
+    ctx.roundRect(-13, -13 + walkBob * 0.3, 22, 26, 5);
+    ctx.fill();
+    ctx.strokeStyle = trimColor;
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+
+    // Spiked Pauldrons (Shoulders)
+    ctx.fillStyle = mainColor;
+    ctx.beginPath();
+    ctx.arc(-2, -15 + walkBob * 0.3, 7.5, 0, Math.PI * 2);
+    ctx.arc(-2, 15 + walkBob * 0.3, 7.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Chest Power Reactor
+    const corePulse = Math.sin(this.animTime * 5) * 0.3 + 0.7;
+    ctx.fillStyle = trimColor;
+    ctx.globalAlpha = corePulse;
+    ctx.beginPath();
+    ctx.arc(0, 0 + walkBob * 0.3, 6.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1.0;
+
+    // Horned War Helm
+    ctx.fillStyle = '#30363d';
+    ctx.beginPath();
+    ctx.arc(5, 0 + walkBob * 0.4, 7.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#f0883e';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Glaring Visor Slit
+    ctx.fillStyle = isBaron ? '#d2a8ff' : '#f0883e';
+    ctx.fillRect(7, -2 + walkBob * 0.4, 4, 4);
+
+    // Giant Warhammer
+    const isAttacking = this.attackAnimTimer > 0;
+    const attackPhase = isAttacking ? 1 - (this.attackAnimTimer / this.attackAnimDuration) : 0;
+    const hammerAngle = isAttacking ? (-1.2 + attackPhase * 2.4) : 0.3;
+
+    ctx.save();
+    ctx.translate(6, 13);
+    ctx.rotate(hammerAngle);
+
+    // Hammer Shaft
+    ctx.fillStyle = '#8b5a2b';
+    ctx.fillRect(-9, -2, 26, 4);
+
+    // Massive Stone Hammer Head
+    ctx.fillStyle = '#484f58';
+    ctx.beginPath();
+    ctx.roundRect(13, -7, 11, 14, 3);
+    ctx.fill();
+    ctx.strokeStyle = trimColor;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.restore();
+
+    // Ground Shockwave on slam hit
+    if (isAttacking && attackPhase > 0.45 && attackPhase < 0.75) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(20, 0, 15 * ((attackPhase - 0.45) / 0.3), 0, Math.PI * 2);
+      ctx.strokeStyle = trimColor;
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
   draw(ctx, camera) {
     const sx = this.x - camera.x;
     const sy = this.y - camera.y;
@@ -277,23 +655,24 @@ class Minion extends Entity {
       ctx.fill();
     }
 
-    // Token Body
-    ctx.beginPath();
-    ctx.arc(sx, sy, this.radius, 0, Math.PI * 2);
-    ctx.fillStyle = this.team === 'blue' ? '#1f6feb' : '#da3633';
-    ctx.fill();
+    // 1. Procedural Vector Frame Rendering with Direction Alignment
+    ctx.save();
+    ctx.translate(sx, sy);
+    ctx.rotate(this.facingAngle);
 
-    ctx.strokeStyle = this.isBaronEmpowered ? '#a371f7' : (this.isSuper ? '#f0883e' : (this.isCannon ? '#d29922' : '#ffffff'));
-    ctx.lineWidth = (this.isSuper || this.isBaronEmpowered) ? 3.5 : 2;
-    ctx.stroke();
+    if (this.type === 'MELEE') {
+      this.drawMeleeFrame(ctx, this.isBaronEmpowered);
+    } else if (this.type === 'RANGED') {
+      this.drawRangedFrame(ctx, this.isBaronEmpowered);
+    } else if (this.type === 'CANNON') {
+      this.drawCannonFrame(ctx, this.isBaronEmpowered);
+    } else if (this.type === 'SUPER') {
+      this.drawSuperFrame(ctx, this.isBaronEmpowered);
+    }
 
-    // Symbol
-    ctx.font = `${Math.round(this.radius * 1.1)}px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(this.symbol, sx, sy);
+    ctx.restore();
 
-    // HP Bar
-    this.drawHpBar(ctx, sx, sy, Math.max(34, this.radius * 2), 5, -this.radius - 10);
+    // 2. HP Bar
+    this.drawHpBar(ctx, sx, sy, Math.max(34, this.radius * 2), 5, -this.radius - 12);
   }
 }

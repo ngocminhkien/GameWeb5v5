@@ -33,24 +33,28 @@ class TerrainRenderer {
     }
   }
 
-  draw(ctx, camera, canvasWidth, canvasHeight) {
-    // 1. Two-toned Terrain Background
-    ctx.fillStyle = '#081412'; // Radiant Verdant Green
+  draw(ctx, camera, canvasWidth, canvasHeight, heroes = []) {
+    const mapAssets = window.mapAssetsInstance || (window.mapAssetsInstance = new MapAssets());
+    this.animTime = (this.animTime || 0) + 0.016;
+
+    // 1. Two-toned Terrain Background with Procedural Pattern
+    ctx.fillStyle = mapAssets.grassPattern || '#081412';
     ctx.fillRect(0 - camera.x, 0 - camera.y, this.mapWidth, this.mapHeight);
 
+    // Dire Volcanic Corner
     ctx.save();
     ctx.beginPath();
     ctx.moveTo(0 - camera.x, 0 - camera.y);
     ctx.lineTo(this.mapWidth - camera.x, 0 - camera.y);
     ctx.lineTo(this.mapWidth - camera.x, this.mapHeight - camera.y);
     ctx.closePath();
-    ctx.fillStyle = '#15090e'; // Dire Volcanic Dark Red
+    ctx.fillStyle = mapAssets.volcanicPattern || '#15090e';
     ctx.fill();
     ctx.restore();
 
-    // 2. Grid lines
+    // 2. Subtle Tactical Grid lines
     const gridSize = 250;
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.025)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.02)';
     ctx.lineWidth = 1;
 
     const visibleLeft = camera.x - canvasWidth;
@@ -74,113 +78,58 @@ class TerrainRenderer {
       ctx.stroke();
     }
 
-    // 3. S-Curved River
-    ctx.fillStyle = 'rgba(14, 58, 102, 0.55)';
-    ctx.beginPath();
-    ctx.moveTo(this.riverPolygon[0].x - camera.x, this.riverPolygon[0].y - camera.y);
-    for (let i = 1; i < this.riverPolygon.length; i++) {
-      ctx.lineTo(this.riverPolygon[i].x - camera.x, this.riverPolygon[i].y - camera.y);
+    // 3. 2.5D Sunken River with Flowing Caustics
+    if (this.riverPolygon && this.riverPolygon.length > 2) {
+      mapAssets.drawRiverWithDepth(ctx, this.riverPolygon, camera, this.animTime);
     }
-    ctx.closePath();
-    ctx.fill();
 
-    // River Shoreline Glow
-    ctx.strokeStyle = 'rgba(56, 139, 253, 0.25)';
-    ctx.lineWidth = 4;
-    ctx.stroke();
+    // 4. Cobblestone Lanes (Top, Mid, Bot)
+    const midPoints = [
+      { x: 1200, y: 13800 },
+      { x: 13800, y: 1200 }
+    ];
+    const topPoints = [
+      { x: 1200, y: 13800 },
+      { x: 1200, y: 1200 },
+      { x: 13800, y: 1200 }
+    ];
+    const botPoints = [
+      { x: 1200, y: 13800 },
+      { x: 13800, y: 13800 },
+      { x: 13800, y: 1200 }
+    ];
+    mapAssets.drawCobblestoneLane(ctx, midPoints, 340, camera);
+    mapAssets.drawCobblestoneLane(ctx, topPoints, 340, camera);
+    mapAssets.drawCobblestoneLane(ctx, botPoints, 340, camera);
 
-    // 4. Lanes (3 lines)
-    ctx.lineWidth = 300;
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.015)';
+    // 5. Elevated Base Hextech Dais / Platforms
+    const blueBase = (typeof CONSTANTS !== 'undefined' && CONSTANTS.BLUE_BASE) || { x: 1200, y: 13800, radius: 750 };
+    const redBase = (typeof CONSTANTS !== 'undefined' && CONSTANTS.RED_BASE) || { x: 13800, y: 1200, radius: 750 };
+    mapAssets.drawBasePlatform(ctx, blueBase, 'blue', camera, this.animTime);
+    mapAssets.drawBasePlatform(ctx, redBase, 'red', camera, this.animTime);
 
-    // Mid
-    ctx.beginPath();
-    ctx.moveTo(1200 - camera.x, 13800 - camera.y);
-    ctx.lineTo(13800 - camera.x, 1200 - camera.y);
-    ctx.stroke();
-
-    // Top
-    ctx.beginPath();
-    ctx.moveTo(1200 - camera.x, 13800 - camera.y);
-    ctx.lineTo(1200 - camera.x, 1200 - camera.y);
-    ctx.lineTo(13800 - camera.x, 1200 - camera.y);
-    ctx.stroke();
-
-    // Bot
-    ctx.beginPath();
-    ctx.moveTo(1200 - camera.x, 13800 - camera.y);
-    ctx.lineTo(13800 - camera.x, 13800 - camera.y);
-    ctx.lineTo(13800 - camera.x, 1200 - camera.y);
-    ctx.stroke();
-
-    // 5. Rock Walls
+    // 6. 2.5D Multi-Tier Stratified Cliffs (with Drop Shadows, Plateau, Fissures)
     for (let w of this.rockWalls) {
       const wx = w.x - camera.x;
       const wy = w.y - camera.y;
 
-      if (wx < -w.w - 100 || wx > canvasWidth + 100 || wy < -w.h - 100 || wy > canvasHeight + 100) continue;
+      // Viewport culling with padding for 3D cliff height & drop shadows
+      if (wx + w.w < -120 || wx > canvasWidth + 120 || wy + w.h < -120 || wy > canvasHeight + 120) continue;
 
-      ctx.fillStyle = '#1c2128';
-      ctx.fillRect(wx, wy, w.w, w.h);
-
-      ctx.strokeStyle = '#444c56';
-      ctx.lineWidth = 3;
-      ctx.strokeRect(wx, wy, w.w, w.h);
-
-      ctx.strokeStyle = '#2d333b';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(wx + 4, wy + 4, w.w - 8, w.h - 8);
-
-      if (w.label) {
-        ctx.font = 'bold 12px Segoe UI, sans-serif';
-        ctx.fillStyle = '#8b949e';
-        ctx.textAlign = 'center';
-        ctx.fillText(w.label, wx + w.w / 2, wy + w.h / 2 + 4);
-      }
+      mapAssets.draw3DCliff(ctx, w, camera, this.animTime);
     }
 
-    // 6. Bushes
+    // 7. Volumetric Multi-Cluster Swaying Bushes
     for (let b of this.bushes) {
       const bx = b.x - camera.x;
       const by = b.y - camera.y;
 
-      if (bx < -b.r * 2 || bx > canvasWidth + b.r * 2 || by < -b.r * 2 || by > canvasHeight + b.r * 2) continue;
+      // Viewport culling
+      if (bx + b.r < -100 || bx - b.r > canvasWidth + 100 || by + b.r < -100 || by - b.r > canvasHeight + 100) continue;
 
-      ctx.beginPath();
-      ctx.arc(bx, by, b.r, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(35, 134, 54, 0.38)';
-      ctx.fill();
-
-      ctx.strokeStyle = '#2ea043';
-      ctx.lineWidth = 2.5;
-      ctx.setLineDash([6, 6]);
-      ctx.stroke();
-      ctx.setLineDash([]);
-
-      ctx.font = '18px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('🌿', bx, by);
+      const hasHero = heroes.some(h => h && h.alive && h.inBush && Math.hypot(h.x - b.x, h.y - b.y) <= b.r);
+      mapAssets.drawVolumetricBush(ctx, b, camera, this.animTime, hasHero);
     }
-
-    // 7. Base Fountains
-    // Blue Base
-    ctx.beginPath();
-    ctx.arc(1200 - camera.x, 13800 - camera.y, 650, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(56, 139, 253, 0.1)';
-    ctx.fill();
-    ctx.strokeStyle = '#388bfd';
-    ctx.lineWidth = 3;
-    ctx.stroke();
-
-    // Red Base
-    ctx.beginPath();
-    ctx.arc(13800 - camera.x, 1200 - camera.y, 650, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(248, 81, 73, 0.1)';
-    ctx.fill();
-    ctx.strokeStyle = '#f85149';
-    ctx.lineWidth = 3;
-    ctx.stroke();
   }
 }
 

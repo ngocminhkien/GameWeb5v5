@@ -1,18 +1,25 @@
 import { CONSTANTS } from '../config/constants.js';
 import { RIVER_POLYGON, LANES, ROCK_WALLS, BUSHES } from '../config/terrain.js';
+import { mapAssetsInstance } from './MapAssets.js';
 
 /**
- * Enhanced Canvas Renderer - Themed Terrain (Verdant Radiant vs Dark Volcanic Dire)
+ * Enhanced Canvas Renderer - 2.5D Depth & Height MOBA Battlefield
  */
 export class Renderer {
   constructor(canvas, ctx) {
     this.canvas = canvas;
     this.ctx = ctx;
+    this.animTime = 0;
   }
 
   render(game) {
     const ctx = this.ctx;
     const camera = game.camera;
+    this.animTime = game.matchTime || (performance.now() * 0.001);
+
+    if (!mapAssetsInstance.initialized) {
+      mapAssetsInstance.init(ctx);
+    }
 
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
@@ -25,26 +32,26 @@ export class Renderer {
 
     const alliedVision = game.getAlliedVisionSources ? game.getAlliedVisionSources() : [];
 
-    // 1. Two-toned Ground (Xanh ngọc lục bảo vs Đất nham thạch)
+    // 1. Two-toned Ground Textures (Radiant Emerald vs Dire Volcanic Crust)
     this.drawTerrainBackground(camera);
 
     // 2. Grid nền chiến thuật
     this.drawGrid(camera);
 
-    // 3. Sông chữ S tự nhiên
+    // 3. Sông có chiều sâu, dốc bờ và hoạt họa gợn sóng caustics
     this.drawRiver(camera);
 
-    // 4. 3 Đường chính
+    // 4. 3 Đường chính lát đá cổ kính
     this.drawLanes(camera);
 
-    // 5. Căn cứ 2 phe
+    // 5. Căn cứ 2 phe Hextech nâng cao
     this.drawBases(camera);
 
-    // 6. Vách đá & Hang Boss móng ngựa
+    // 6. Vách đá 2.5D có độ cao, bóng đổ và vân nứt thớ đá
     this.drawWalls(camera);
 
-    // 7. Bụi cỏ chiến thuật
-    this.drawBushes(camera);
+    // 7. Bụi cỏ thể tích đung đưa theo gió
+    this.drawBushes(camera, game.heroes);
 
     // 7.5. Lớp Sương Mù Chiến Tranh (Fog of War)
     if (game.fogOfWar) {
@@ -106,26 +113,34 @@ export class Renderer {
     const w = CONSTANTS.MAP_WIDTH;
     const h = CONSTANTS.MAP_HEIGHT;
 
-    // Nửa Xanh (Bottom-Left): Thảo nguyên xanh tươi
-    ctx.fillStyle = '#081412';
+    // Nửa Xanh (Bottom-Left): Thảo nguyên cỏ ngọc Radiant
+    if (mapAssetsInstance.patterns.grass) {
+      ctx.fillStyle = mapAssetsInstance.patterns.grass;
+    } else {
+      ctx.fillStyle = '#081813';
+    }
     ctx.fillRect(0 - camera.x, 0 - camera.y, w, h);
 
-    // Nửa Đỏ (Top-Right): Nham thạch hắc ám (Cắt theo đường chéo chính)
+    // Nửa Đỏ (Top-Right): Nham thạch hắc ám Dire (Cắt theo đường chéo tự nhiên)
     ctx.save();
     ctx.beginPath();
     ctx.moveTo(0 - camera.x, 0 - camera.y);
     ctx.lineTo(w - camera.x, 0 - camera.y);
     ctx.lineTo(w - camera.x, h - camera.y);
     ctx.closePath();
-    ctx.fillStyle = '#15090e';
+    if (mapAssetsInstance.patterns.volcanic) {
+      ctx.fillStyle = mapAssetsInstance.patterns.volcanic;
+    } else {
+      ctx.fillStyle = '#140a0e';
+    }
     ctx.fill();
     ctx.restore();
   }
 
   drawGrid(camera) {
     const ctx = this.ctx;
-    const gridSize = 250;
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.02)';
+    const gridSize = 300;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.018)';
     ctx.lineWidth = 1;
 
     const visibleLeft = camera.x - this.canvas.width;
@@ -152,119 +167,56 @@ export class Renderer {
 
   drawRiver(camera) {
     const ctx = this.ctx;
-    ctx.fillStyle = 'rgba(14, 58, 102, 0.55)';
-    ctx.beginPath();
-
-    const pts = RIVER_POLYGON;
-    ctx.moveTo(pts[0].x - camera.x, pts[0].y - camera.y);
-    for (let i = 1; i < pts.length; i++) {
-      ctx.lineTo(pts[i].x - camera.x, pts[i].y - camera.y);
-    }
-    ctx.closePath();
-    ctx.fill();
-
-    // Bờ sông phát sáng nhẹ
-    ctx.strokeStyle = 'rgba(56, 139, 253, 0.25)';
-    ctx.lineWidth = 12;
-    ctx.lineJoin = 'round';
-    ctx.stroke();
+    mapAssetsInstance.drawRiverWithDepth(ctx, RIVER_POLYGON, camera, this.animTime);
   }
 
   drawLanes(camera) {
     const ctx = this.ctx;
-    ctx.strokeStyle = 'rgba(200, 180, 140, 0.08)'; // Màu đất lối mòn
-    ctx.lineWidth = CONSTANTS.LANE_WIDTH;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
+    const laneW = CONSTANTS.LANE_WIDTH || 340;
 
-    // Mid
-    ctx.beginPath();
-    ctx.moveTo(LANES.mid.from.x - camera.x, LANES.mid.from.y - camera.y);
-    ctx.lineTo(LANES.mid.to.x - camera.x, LANES.mid.to.y - camera.y);
-    ctx.stroke();
-
-    // Top
-    ctx.beginPath();
-    ctx.moveTo(LANES.top.points[0].x - camera.x, LANES.top.points[0].y - camera.y);
-    for (let i = 1; i < LANES.top.points.length; i++) {
-      ctx.lineTo(LANES.top.points[i].x - camera.x, LANES.top.points[i].y - camera.y);
-    }
-    ctx.stroke();
-
-    // Bot
-    ctx.beginPath();
-    ctx.moveTo(LANES.bot.points[0].x - camera.x, LANES.bot.points[0].y - camera.y);
-    for (let i = 1; i < LANES.bot.points.length; i++) {
-      ctx.lineTo(LANES.bot.points[i].x - camera.x, LANES.bot.points[i].y - camera.y);
-    }
-    ctx.stroke();
+    // 2.5D Cobblestone paved lanes with curbs and waypoints
+    const midPoints = [LANES.mid.from, LANES.mid.to];
+    mapAssetsInstance.drawCobblestoneLane(ctx, midPoints, laneW, camera);
+    mapAssetsInstance.drawCobblestoneLane(ctx, LANES.top.points, laneW, camera);
+    mapAssetsInstance.drawCobblestoneLane(ctx, LANES.bot.points, laneW, camera);
   }
 
   drawBases(camera) {
     const ctx = this.ctx;
-    // Blue Base (Thành trì Đá & Ma Thuật)
-    ctx.fillStyle = 'rgba(31, 111, 235, 0.22)';
-    ctx.beginPath();
-    ctx.arc(CONSTANTS.BLUE_BASE.x - camera.x, CONSTANTS.BLUE_BASE.y - camera.y, CONSTANTS.BLUE_BASE.radius, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#388bfd';
-    ctx.lineWidth = 5;
-    ctx.stroke();
-
-    // Red Base (Pháo đài Nham Thạch)
-    ctx.fillStyle = 'rgba(218, 54, 51, 0.22)';
-    ctx.beginPath();
-    ctx.arc(CONSTANTS.RED_BASE.x - camera.x, CONSTANTS.RED_BASE.y - camera.y, CONSTANTS.RED_BASE.radius, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#f85149';
-    ctx.lineWidth = 5;
-    ctx.stroke();
+    mapAssetsInstance.drawBasePlatform(ctx, CONSTANTS.BLUE_BASE, 'blue', camera, this.animTime);
+    mapAssetsInstance.drawBasePlatform(ctx, CONSTANTS.RED_BASE, 'red', camera, this.animTime);
   }
 
   drawWalls(camera) {
     const ctx = this.ctx;
+    const cw = this.canvas.width;
+    const ch = this.canvas.height;
+
     for (let w of ROCK_WALLS) {
       const sx = w.x - camera.x;
       const sy = w.y - camera.y;
 
-      ctx.fillStyle = '#1c222b';
-      ctx.beginPath();
-      ctx.roundRect(sx, sy, w.w, w.h, 14);
-      ctx.fill();
-      ctx.strokeStyle = '#323945';
-      ctx.lineWidth = 3.5;
-      ctx.stroke();
+      // Viewport culling
+      if (sx + w.w < -120 || sx > cw + 120 || sy + w.h < -120 || sy > ch + 120) continue;
 
-      if (w.label) {
-        ctx.font = 'bold 13px Segoe UI, sans-serif';
-        ctx.fillStyle = '#a0aec0';
-        ctx.textAlign = 'center';
-        ctx.fillText(w.label, sx + w.w / 2, sy + w.h / 2 + 5);
-      }
+      mapAssetsInstance.draw3DCliff(ctx, w, camera, this.animTime);
     }
   }
 
-  drawBushes(camera) {
+  drawBushes(camera, heroes = []) {
     const ctx = this.ctx;
+    const cw = this.canvas.width;
+    const ch = this.canvas.height;
+
     for (let b of BUSHES) {
       const sx = b.x - camera.x;
       const sy = b.y - camera.y;
 
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(sx, sy, b.r, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(46, 160, 67, 0.28)';
-      ctx.fill();
-      ctx.strokeStyle = '#238636';
-      ctx.lineWidth = 3;
-      ctx.setLineDash([7, 4]);
-      ctx.stroke();
+      // Viewport culling
+      if (sx + b.r < -100 || sx - b.r > cw + 100 || sy + b.r < -100 || sy - b.r > ch + 100) continue;
 
-      ctx.font = '22px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('🌿', sx, sy);
-      ctx.restore();
+      const hasHero = heroes.some(h => h && h.alive && h.inBush && Math.hypot(h.x - b.x, h.y - b.y) <= b.r);
+      mapAssetsInstance.drawVolumetricBush(ctx, b, camera, this.animTime, hasHero);
     }
   }
 
