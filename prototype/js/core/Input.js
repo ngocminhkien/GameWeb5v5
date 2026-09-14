@@ -49,12 +49,15 @@ class InputManager {
 
     // Mouse Down
     this.canvas.addEventListener('mousedown', (e) => {
-      const shop = document.getElementById('shop-modal');
-      if (shop && shop.style.display !== 'none' && shop.style.visibility !== 'hidden') {
-        const rect = shop.getBoundingClientRect();
-        if (e.clientX >= rect.left && e.clientX <= rect.right &&
-            e.clientY >= rect.top && e.clientY <= rect.bottom) {
-          return;
+      const ignoreSelectors = ['#minimap-wrapper', '#hud', '#shop-modal', '#scoreboard-modal', '#victory-modal'];
+      for (const sel of ignoreSelectors) {
+        const el = document.querySelector(sel);
+        if (el && el.style.display !== 'none' && el.style.visibility !== 'hidden') {
+          const rect = el.getBoundingClientRect();
+          if (e.clientX >= rect.left && e.clientX <= rect.right &&
+              e.clientY >= rect.top && e.clientY <= rect.bottom) {
+            return;
+          }
         }
       }
 
@@ -106,6 +109,15 @@ class InputManager {
       const k = e.key.toUpperCase();
       this.keys[k] = true;
 
+      // Scoreboard on Tab (Hold to view)
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        if (this.game.hud && this.game.hud.showScoreboard) {
+          this.game.hud.showScoreboard(this.game.heroes);
+        }
+        return;
+      }
+
       // Ctrl + Q / W / E / R: Quick upgrade skill
       if (e.ctrlKey && ['Q', 'W', 'E', 'R'].includes(k)) {
         e.preventDefault();
@@ -142,14 +154,22 @@ class InputManager {
       if (k === 'Y') {
         const locked = this.game.camera.toggleLock();
         this.game.hud.updateCameraBtn(locked);
-        this.game.hud.announce(locked ? '📷 [Y] Đã KHÓA Camera' : '📷 [Y] Đã MỞ KHÓA Camera');
-      } else if (['Q', 'W', 'E', 'R', 'B'].includes(k)) {
+        if (this.game.hud && this.game.hud.announce) {
+          this.game.hud.announce(locked ? '📷 [Y] Đã KHÓA Camera' : '📷 [Y] Đã MỞ KHÓA Camera');
+        }
+      } else if (['Q', 'W', 'E', 'R', 'B', 'D', 'F'].includes(k)) {
         this.game.usePlayerSkill(k);
       }
     });
 
     window.addEventListener('keyup', (e) => {
       this.keys[e.key.toUpperCase()] = false;
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        if (this.game.hud && this.game.hud.hideScoreboard) {
+          this.game.hud.hideScoreboard();
+        }
+      }
     });
 
     // Minimap Interaction

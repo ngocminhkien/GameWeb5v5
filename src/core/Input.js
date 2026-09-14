@@ -24,7 +24,8 @@ export class Input {
       onRightClickMove: null,
       onToggleShop: null,
       onCloseShop: null,
-      onUseItem: null
+      onUseItem: null,
+      onScoreboard: null
     };
 
     this.initListeners();
@@ -46,31 +47,16 @@ export class Input {
     });
 
     window.addEventListener('mousedown', (e) => {
-      // Ignore if clicking minimap or HUD or Shop
-      const mini = document.getElementById('minimap-wrapper');
-      if (mini) {
-        const rect = mini.getBoundingClientRect();
-        if (e.clientX >= rect.left && e.clientX <= rect.right &&
-            e.clientY >= rect.top && e.clientY <= rect.bottom) {
-          return;
-        }
-      }
-
-      const hud = document.getElementById('hud');
-      if (hud) {
-        const rect = hud.getBoundingClientRect();
-        if (e.clientX >= rect.left && e.clientX <= rect.right &&
-            e.clientY >= rect.top && e.clientY <= rect.bottom) {
-          return;
-        }
-      }
-
-      const shop = document.getElementById('shop-modal');
-      if (shop && shop.style.display !== 'none' && shop.style.visibility !== 'hidden') {
-        const rect = shop.getBoundingClientRect();
-        if (e.clientX >= rect.left && e.clientX <= rect.right &&
-            e.clientY >= rect.top && e.clientY <= rect.bottom) {
-          return;
+      // Ignore if clicking minimap, HUD, Shop, Scoreboard, or Victory modal
+      const ignoreSelectors = ['#minimap-wrapper', '#hud', '#shop-modal', '#scoreboard-modal', '#victory-modal'];
+      for (const sel of ignoreSelectors) {
+        const el = document.querySelector(sel);
+        if (el && el.style.display !== 'none' && el.style.visibility !== 'hidden') {
+          const rect = el.getBoundingClientRect();
+          if (e.clientX >= rect.left && e.clientX <= rect.right &&
+              e.clientY >= rect.top && e.clientY <= rect.bottom) {
+            return;
+          }
         }
       }
 
@@ -111,6 +97,13 @@ export class Input {
       const k = e.key.toUpperCase();
       this.keys[k] = true;
 
+      // Scoreboard on Tab (Hold to view)
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        if (this.listeners.onScoreboard) this.listeners.onScoreboard(true);
+        return;
+      }
+
       // Close Shop on Escape
       if (e.key === 'Escape') {
         if (this.listeners.onCloseShop) this.listeners.onCloseShop();
@@ -139,13 +132,17 @@ export class Input {
 
       if (k === 'Y') {
         if (this.listeners.onToggleCamera) this.listeners.onToggleCamera();
-      } else if (['Q', 'W', 'E', 'R', 'B'].includes(k)) {
+      } else if (['Q', 'W', 'E', 'R', 'B', 'D', 'F'].includes(k)) {
         if (this.listeners.onSkill) this.listeners.onSkill(k);
       }
     });
 
     window.addEventListener('keyup', (e) => {
       this.keys[e.key.toUpperCase()] = false;
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        if (this.listeners.onScoreboard) this.listeners.onScoreboard(false);
+      }
     });
   }
 }

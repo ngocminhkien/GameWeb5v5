@@ -90,16 +90,23 @@ class Game {
     this.hud.updateScores(0, 0);
 
     // 1. Towers
-    for (let cfg of TOWERS_CONFIG) {
-      this.towers.push(new Tower(cfg));
-    }
+    this.isGameOver = false;
+    this.blueScore = 0;
+    this.redScore = 0;
+    this.heroes = [];
+    this.botAIs = [];
+    this.minions = [];
+    this.projectiles = [];
+    this.particles = [];
+    this.clickWaves = [];
+    this.waveTimer = 60.0;
+    this.waveInterval = 30.0;
+    this.waveCount = 0;
 
-    // 2. Neutral Monsters
-    for (let cfg of MONSTERS_CONFIG) {
-      this.monsters.push(new Monster(cfg));
-    }
+    // Load Towers & Monsters Config
+    this.towers = TOWERS_CONFIG.map(cfg => new Tower(cfg));
+    this.monsters = MONSTERS_CONFIG.map(cfg => new Monster(cfg));
 
-    // 3. Heroes & Bot AIs
     if (this.mode === 'solo') {
       this.player = new Hero({
         id: 'player',
@@ -110,7 +117,9 @@ class Game {
         x: 7000,
         y: 8000,
         avatarColor: '#8957e5',
-        symbol: '🧙‍♂️'
+        symbol: '🧙‍♂️',
+        spellD: 'flash',
+        spellF: 'heal'
       });
       this.heroes.push(this.player);
 
@@ -124,7 +133,9 @@ class Game {
         y: 7000,
         avatarColor: '#2ea043',
         symbol: '⚔️',
-        lane: 'MID'
+        lane: 'MID',
+        spellD: 'flash',
+        spellF: 'ignite'
       });
       this.heroes.push(botEnemy);
       this.botAIs.push(new BotAI(botEnemy));
@@ -142,15 +153,17 @@ class Game {
         y: 13200,
         avatarColor: '#8957e5',
         symbol: '🧙‍♂️',
-        lane: 'MID'
+        lane: 'MID',
+        spellD: 'flash',
+        spellF: 'heal'
       });
       this.heroes.push(this.player);
 
       const blueAllies = [
-        { name: 'Đồng Minh (Tank - Malphite)', championId: 'tank', lane: 'TOP', symbol: '🗿', color: '#d29922', x: 1400, y: 12800 },
-        { name: 'Đồng Minh (Yasuo)', championId: 'assassin', lane: 'MID', symbol: '⚔️', color: '#2ea043', x: 2200, y: 12800 },
-        { name: 'Đồng Minh (ADC - Ashe)', championId: 'adc', lane: 'BOT', symbol: '🏹', color: '#58a6ff', x: 2400, y: 13600 },
-        { name: 'Đồng Minh (Valhein)', championId: 'mage', lane: 'BOT', symbol: '🔮', color: '#8957e5', x: 1600, y: 14000 }
+        { name: 'Đồng Minh (Tank - Malphite)', championId: 'tank', lane: 'TOP', symbol: '🗿', color: '#d29922', x: 1400, y: 12800, spellD: 'flash', spellF: 'heal' },
+        { name: 'Đồng Minh (Yasuo - Rừng)', championId: 'assassin', lane: 'JUNGLE', symbol: '⚔️', color: '#2ea043', x: 2200, y: 12800, spellD: 'flash', spellF: 'smite' },
+        { name: 'Đồng Minh (ADC - Ashe)', championId: 'adc', lane: 'BOT', symbol: '🏹', color: '#58a6ff', x: 2400, y: 13600, spellD: 'flash', spellF: 'heal' },
+        { name: 'Đồng Minh (Valhein)', championId: 'mage', lane: 'BOT', symbol: '🔮', color: '#8957e5', x: 1600, y: 14000, spellD: 'flash', spellF: 'ignite' }
       ];
       blueAllies.forEach((a, i) => {
         const h = new Hero({
@@ -163,18 +176,20 @@ class Game {
           y: a.y,
           avatarColor: a.color,
           symbol: a.symbol,
-          lane: a.lane
+          lane: a.lane,
+          spellD: a.spellD,
+          spellF: a.spellF
         });
         this.heroes.push(h);
         this.botAIs.push(new BotAI(h));
       });
 
       const redBots = [
-        { name: 'Bot Đỏ (Tank - Malphite)', championId: 'tank', lane: 'TOP', symbol: '🗿', color: '#d29922', x: 13600, y: 2200 },
-        { name: 'Bot Đỏ (Valhein)', championId: 'mage', lane: 'MID', symbol: '🔮', color: '#8957e5', x: 13200, y: 1800 },
-        { name: 'Bot Đỏ (Yasuo)', championId: 'assassin', lane: 'MID', symbol: '⚔️', color: '#2ea043', x: 12800, y: 2200 },
-        { name: 'Bot Đỏ (ADC - Ashe)', championId: 'adc', lane: 'BOT', symbol: '🏹', color: '#58a6ff', x: 12600, y: 1400 },
-        { name: 'Bot Đỏ (Hỗ Trợ)', championId: 'tank', lane: 'BOT', symbol: '🛡️', color: '#da3633', x: 13400, y: 1000 }
+        { name: 'Bot Đỏ (Tank - Malphite)', championId: 'tank', lane: 'TOP', symbol: '🗿', color: '#d29922', x: 13600, y: 2200, spellD: 'flash', spellF: 'heal' },
+        { name: 'Bot Đỏ (Valhein - Mid)', championId: 'mage', lane: 'MID', symbol: '🔮', color: '#8957e5', x: 13200, y: 1800, spellD: 'flash', spellF: 'ignite' },
+        { name: 'Bot Đỏ (Yasuo - Rừng)', championId: 'assassin', lane: 'JUNGLE', symbol: '⚔️', color: '#2ea043', x: 12800, y: 2200, spellD: 'flash', spellF: 'smite' },
+        { name: 'Bot Đỏ (ADC - Ashe)', championId: 'adc', lane: 'BOT', symbol: '🏹', color: '#58a6ff', x: 12600, y: 1400, spellD: 'flash', spellF: 'heal' },
+        { name: 'Bot Đỏ (Hỗ Trợ)', championId: 'tank', lane: 'BOT', symbol: '🛡️', color: '#da3633', x: 13400, y: 1000, spellD: 'flash', spellF: 'barrier' }
       ];
       redBots.forEach((b, i) => {
         const h = new Hero({
@@ -187,7 +202,9 @@ class Game {
           y: b.y,
           avatarColor: b.color,
           symbol: b.symbol,
-          lane: b.lane
+          lane: b.lane,
+          spellD: b.spellD,
+          spellF: b.spellF
         });
         this.heroes.push(h);
         this.botAIs.push(new BotAI(h));
@@ -234,7 +251,34 @@ class Game {
       if (this.hud.updateChampionSkills) {
         this.hud.updateChampionSkills(this.player.championId || 'mage');
       }
+      if (this.hud.updateSummonerSpells) {
+        this.hud.updateSummonerSpells(this.player);
+      }
     }
+  }
+
+  onMatchEnd(winningTeam) {
+    if (this.isGameOver) return;
+    this.isGameOver = true;
+
+    let mvpHero = null;
+    let maxScore = -999999;
+    for (let h of this.heroes) {
+      const winBonus = h.team === winningTeam ? 15 : 0;
+      const score = ((h.kills || 0) * 3) + ((h.assists || 0) * 2) - ((h.deaths || 0) * 1.5) + (((h.damageDealt || 0) / 1500)) + (((h.cs || 0) * 0.2)) + winBonus;
+      if (score > maxScore) {
+        maxScore = score;
+        mvpHero = h;
+      }
+    }
+
+    this.hud.showVictoryModal(winningTeam, this.heroes, mvpHero, () => {
+      this.restartMatch();
+    });
+  }
+
+  restartMatch() {
+    this.initMatch();
   }
 
   start() {
@@ -340,6 +384,18 @@ class Game {
       team = target.team === 'blue' ? 'red' : 'blue';
     }
 
+    // Track KDA & CS
+    if (target.kills !== undefined) {
+      target.deaths = (target.deaths || 0) + 1;
+      if (killerHero && killerHero.kills !== undefined) {
+        killerHero.kills = (killerHero.kills || 0) + 1;
+      }
+    } else if (target.radius && (target.type === 'melee' || target.type === 'ranged' || target.type === 'cannon' || target.buffType !== undefined || target.type === 'wolf' || target.type === 'raptor')) {
+      if (killerHero && killerHero.cs !== undefined) {
+        killerHero.cs = (killerHero.cs || 0) + 1;
+      }
+    }
+
     // 1. Killer
     if (killerHero && killerHero.addExp && killerHero.alive) {
       killerHero.addExp(baseExp, (lvl) => {
@@ -355,6 +411,9 @@ class Game {
       if (h.alive && h.team === team && h !== killerHero) {
         const d = Math.hypot(h.x - target.x, h.y - target.y);
         if (d <= ECONOMY.ASSIST_RADIUS) {
+          if (target.kills !== undefined && h.assists !== undefined) {
+            h.assists = (h.assists || 0) + 1;
+          }
           const expShare = killerHero && killerHero.addExp ? Math.round(baseExp * 0.5) : baseExp;
           const goldShare = killerHero && killerHero.addGold ? Math.round(baseGold * 0.5) : baseGold;
           h.addExp(expShare, null, this.hud.addFloatingText.bind(this.hud));
@@ -477,6 +536,25 @@ class Game {
       });
     } else if (slot === 'B') {
       this.player.recall(this.hud.addFloatingText.bind(this.hud));
+    } else if (slot === 'D' || slot === 'F') {
+      const clickWaveFn = (x, y, color) => {
+        this.clickWaves.push({ x, y, r: 6, maxR: 35, color: color || '#388bfd', alpha: 1.0 });
+      };
+      this.player.castSummonerSpell(
+        slot,
+        mouse.worldX,
+        mouse.worldY,
+        this.heroes,
+        this.minions,
+        this.monsters,
+        ROCK_WALLS,
+        this.hud.addFloatingText.bind(this.hud),
+        clickWaveFn,
+        this.projectiles
+      );
+      if (this.hud && this.hud.updateCooldowns) {
+        this.hud.updateCooldowns(this.player);
+      }
     }
   }
 
@@ -838,6 +916,11 @@ class Game {
                 this.hud.announce(`⚠️ ${deadTower.name} ĐÃ BỊ PHÁ HỦY! Lính Siêu Cấp sẽ xuất hiện trong 5 phút!`);
               } else {
                 this.hud.announce(`🏰 ${deadTower.name} ĐÃ BỊ PHÁ HỦY!`);
+              }
+              if (deadTower.id === 'r_nexus') {
+                this.onMatchEnd('blue');
+              } else if (deadTower.id === 'b_nexus') {
+                this.onMatchEnd('red');
               }
               const b = BOUNTIES.TOWER_DESTROY;
               this.distributeRewards(deadTower, killer, 0, b.gold, b.teamExp, b.teamGold);

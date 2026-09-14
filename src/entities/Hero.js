@@ -3,6 +3,7 @@ import { Projectile } from './Projectile.js';
 import { CONSTANTS } from '../config/constants.js';
 import { ITEMS } from '../config/items.js';
 import { CHAMPIONS } from '../config/champions.js';
+import { SPELLS } from '../config/spells.js';
 
 /**
  * Hero Token Class (Inner circle avatar + Outer HP/Mana arcs)
@@ -48,15 +49,32 @@ export class Hero extends Entity {
     this.abilityPower = cDef.baseStats.abilityPower;
     this.baseAbilityPower = cDef.baseStats.abilityPower;
 
-    // Skill cooldowns
-    this.cooldowns = { Q: 0, W: 0, E: 0, R: 0, B: 0 };
+    // Summoner Spells (D & F)
+    this.spells = {
+      D: config.spellD || 'flash',
+      F: config.spellF || (config.lane === 'JUNGLE' ? 'smite' : 'heal')
+    };
+
+    // Skill & Spell cooldowns
+    this.cooldowns = { Q: 0, W: 0, E: 0, R: 0, B: 0, D: 0, F: 0 };
     this.maxCooldowns = {
       Q: cDef.skills.Q.cd[0],
       W: cDef.skills.W.cd[0],
       E: cDef.skills.E.cd[0],
       R: cDef.skills.R.cd[0],
-      B: CONSTANTS.SKILL_RANKS.B.cd
+      B: CONSTANTS.SKILL_RANKS.B.cd,
+      D: SPELLS[this.spells.D] ? SPELLS[this.spells.D].cooldown : 240,
+      F: SPELLS[this.spells.F] ? SPELLS[this.spells.F].cooldown : 180
     };
+
+    // Match Performance & Tracking (KDA, CS, Damage, Gold)
+    this.kills = 0;
+    this.deaths = 0;
+    this.assists = 0;
+    this.cs = 0;
+    this.damageDealt = 0;
+    this.damageTaken = 0;
+    this.totalGoldEarned = config.gold || CONSTANTS.ECONOMY.INITIAL_GOLD;
 
     // Progression & Economy (Level 1 to 15)
     this.level = 1;
@@ -223,9 +241,229 @@ export class Hero extends Entity {
 
   addGold(amount, addFloatingText = null) {
     this.gold += amount;
+    this.totalGoldEarned = (this.totalGoldEarned || 0) + amount;
     if (this.isPlayer && addFloatingText) {
       addFloatingText(`+${Math.round(amount)} 💰`, this.x + (Math.random() * 24 - 12), this.y - 32, '#ffd700');
     }
+  }
+
+  takeDamage(amount, attacker = null, addFloatingText = null) {
+    if (!this.alive || this.isStasis || this.isReviving) return;
+
+    // Tính toán giảm trừ sát thương từ Giáp
+    const armorMitigation = 100 / (100 + Math.max(0, this.armor));
+    let finalDamage = Math.round(amount * armorMitigation);
+
+    let absorbed = 0;
+    if (this.shield > 0) {
+      if (this.shield >= finalDamage) {
+        this.shield -= finalDamage;
+        absorbed = finalDamage;
+        finalDamage = 0;
+      } else {
+        finalDamage -= this.shield;
+        absorbed = this.shield;
+        this.shield = 0;
+      }
+    }
+
+    // Shieldbow kích hoạt khi máu dưới 30%
+    if (this.hasShieldbow && this.shieldbowCooldown <= 0 && (this.hp - finalDamage) / this.maxHp <= 0.30) {
+      this.shield = 400;
+      this.shieldbowCooldown = 90.0;
+      if (addFloatingText) addFloatingText('🛡️ NỎ TỬ THỦ (+400 KHIÊN)!', this.x, this.y - 45, '#e84393');
+    }
+
+    this.hp -= finalDamage;
+    const actualDamage = finalDamage + absorbed;
+    this.damageTaken = (this.damageTaken || 0) + actualDamage;
+    if (attacker && attacker !== this) {
+      attacker.damageDealt = (attacker.damageDealt || 0) + actualDamage;
+    }
+
+    // Phản sát thương Giáp Gai (Thornmail)
+    if (this.hasThornmail && attacker && attacker.alive && attacker.takeDamage && this.thornRatio > 0) {
+      const reflectDmg = Math.round(finalDamage * this.thornRatio);
+      if (reflectDmg > 0) {
+        attacker.takeDamage(reflectDmg, this, addFloatingText);
+        if (addFloatingText) addFloatingText(`🌵 -${reflectDmg}`, attacker.x, attacker.y - 25, '#d63031');
+      }
+    }
+
+    if (this.hp <= 0) {
+      this.hp = 0;
+      // Kích hoạt Giáp Thiên Thần (GA) nếu có
+      if (this.hasGuardianAngel && this.gaCooldown <= 0) {
+        this.isReviving = true;
+        this.reviveTimer = 4.0;
+        this.gaCooldown = 240.0;
+        if (addFloatingText) addFloatingText('👼 HỒI SINH (4s)!', this.x, this.y - 45, '#fdcb6e');
+        return;
+      }
+      this.die(attacker);
+    }
+  }
+
+  castSummonerSpell(slot, targetX, targetY, heroes = [], minions = [], monsters = [], walls = [], addFloatingText = null, createClickWave = null, projectiles = []) {
+    if (!this.alive || this.isStasis || this.isReviving || this.stunTimer > 0 || this.knockupTimer > 0) {
+      return false;
+    }
+    const spellKey = this.spells ? this.spells[slot] : null;
+    if (!spellKey) return false;
+    if (this.cooldowns[slot] > 0) return false;
+
+    const spellDef = SPELLS[spellKey];
+    const maxCd = spellDef ? spellDef.cooldown : (slot === 'D' ? 240 : 180);
+
+    if (spellKey === 'flash') {
+      const dx = targetX - this.x;
+      const dy = targetY - this.y;
+      const dist = Math.hypot(dx, dy);
+      const angle = dist > 0.001 ? Math.atan2(dy, dx) : this.facingAngle;
+      const blinkDist = Math.min(420, Math.max(80, dist));
+      let newX = Math.max(100, Math.min(14900, this.x + Math.cos(angle) * blinkDist));
+      let newY = Math.max(100, Math.min(14900, this.y + Math.sin(angle) * blinkDist));
+
+      if (walls) {
+        for (let w of walls) {
+          if (newX >= w.x && newX <= w.x + w.w && newY >= w.y && newY <= w.y + w.h) {
+            const leftDist = Math.abs(newX - w.x);
+            const rightDist = Math.abs(newX - (w.x + w.w));
+            const topDist = Math.abs(newY - w.y);
+            const botDist = Math.abs(newY - (w.y + w.h));
+            const minEdge = Math.min(leftDist, rightDist, topDist, botDist);
+            if (minEdge === leftDist) newX = w.x - this.radius - 2;
+            else if (minEdge === rightDist) newX = w.x + w.w + this.radius + 2;
+            else if (minEdge === topDist) newY = w.y - this.radius - 2;
+            else newY = w.y + w.h + this.radius + 2;
+            break;
+          }
+        }
+      }
+
+      this.x = newX;
+      this.y = newY;
+      this.targetX = newX;
+      this.targetY = newY;
+      this.cooldowns[slot] = maxCd;
+
+      if (createClickWave) createClickWave(newX, newY, '#ffd700');
+      if (addFloatingText) addFloatingText('⚡ TỐC BIẾN!', newX, newY - 45, '#ffd700');
+      return true;
+    } else if (spellKey === 'heal') {
+      const healAmount = Math.round(300 + 20 * this.level);
+      this.hp = Math.min(this.maxHp, this.hp + healAmount);
+      this.speedBoostTimer = 2.0;
+      this.recalculateStats();
+      this.cooldowns[slot] = maxCd;
+
+      if (addFloatingText) addFloatingText(`+${healAmount} HP 🩸`, this.x, this.y - 45, '#2ea043');
+      if (createClickWave) createClickWave(this.x, this.y, '#2ea043');
+
+      if (heroes) {
+        let lowestAlly = null;
+        let lowestRatio = 1.0;
+        for (let h of heroes) {
+          if (h !== this && h.alive && h.team === this.team) {
+            const d = Math.hypot(h.x - this.x, h.y - this.y);
+            if (d <= 600) {
+              const r = h.hp / h.maxHp;
+              if (r < lowestRatio) {
+                lowestRatio = r;
+                lowestAlly = h;
+              }
+            }
+          }
+        }
+        if (lowestAlly) {
+          lowestAlly.hp = Math.min(lowestAlly.maxHp, lowestAlly.hp + healAmount);
+          lowestAlly.speedBoostTimer = 2.0;
+          lowestAlly.recalculateStats();
+          if (addFloatingText) addFloatingText(`+${healAmount} HP 🩸`, lowestAlly.x, lowestAlly.y - 45, '#2ea043');
+          if (createClickWave) createClickWave(lowestAlly.x, lowestAlly.y, '#2ea043');
+        }
+      }
+      return true;
+    } else if (spellKey === 'smite') {
+      const smiteDamage = Math.round(650 + 35 * this.level);
+      const candidates = [];
+      if (monsters) {
+        for (let m of monsters) {
+          if (m.alive && Math.hypot(m.x - this.x, m.y - this.y) <= 550) {
+            candidates.push(m);
+          }
+        }
+      }
+      if (minions) {
+        for (let mn of minions) {
+          if (mn.alive && mn.team !== this.team && Math.hypot(mn.x - this.x, mn.y - this.y) <= 550) {
+            candidates.push(mn);
+          }
+        }
+      }
+
+      let bestTarget = null;
+      let closestDist = 99999;
+      for (let c of candidates) {
+        const d = Math.hypot(c.x - targetX, c.y - targetY);
+        if (d < closestDist) {
+          closestDist = d;
+          bestTarget = c;
+        }
+      }
+
+      if (bestTarget) {
+        bestTarget.takeDamage(smiteDamage, this, addFloatingText);
+        const selfHeal = Math.round(this.maxHp * 0.15);
+        this.hp = Math.min(this.maxHp, this.hp + selfHeal);
+        this.cooldowns[slot] = maxCd;
+        if (addFloatingText) {
+          addFloatingText(`⚔️ TRỪNG PHẠT -${smiteDamage}!`, bestTarget.x, bestTarget.y - 40, '#ffd700');
+          addFloatingText(`+${selfHeal} HP 🩸`, this.x, this.y - 40, '#2ea043');
+        }
+        if (createClickWave) createClickWave(bestTarget.x, bestTarget.y, '#ffd700');
+        return true;
+      } else {
+        if (this.isPlayer && addFloatingText) addFloatingText('⚠️ Không có quái hoặc lính trong tầm Trừng Phạt!', this.x, this.y - 35, '#ff7b72');
+        return false;
+      }
+    } else if (spellKey === 'ignite') {
+      const totalBurn = Math.round(80 + 25 * this.level);
+      let bestHero = null;
+      let closestDist = 99999;
+      if (heroes) {
+        for (let h of heroes) {
+          if (h.alive && h.team !== this.team && Math.hypot(h.x - this.x, h.y - this.y) <= 600) {
+            const d = Math.hypot(h.x - targetX, h.y - targetY);
+            if (d < closestDist) {
+              closestDist = d;
+              bestHero = h;
+            }
+          }
+        }
+      }
+
+      if (bestHero) {
+        bestHero.igniteTimer = 5.0;
+        bestHero.igniteDps = totalBurn / 5.0;
+        bestHero.igniteAttacker = this;
+        this.cooldowns[slot] = maxCd;
+        if (addFloatingText) addFloatingText('🔥 THIÊU ĐỐT (5s)!', bestHero.x, bestHero.y - 40, '#f85149');
+        if (createClickWave) createClickWave(bestHero.x, bestHero.y, '#f85149');
+        return true;
+      } else {
+        if (this.isPlayer && addFloatingText) addFloatingText('⚠️ Không có tướng địch trong tầm Thiêu Đốt!', this.x, this.y - 35, '#ff7b72');
+        return false;
+      }
+    } else if (spellKey === 'barrier') {
+      const shieldAmt = Math.round(350 + 25 * this.level);
+      this.shield = Math.max(this.shield, shieldAmt);
+      this.cooldowns[slot] = maxCd;
+      if (addFloatingText) addFloatingText(`🛡️ LÁ CHẮN (+${shieldAmt})!`, this.x, this.y - 45, '#58a6ff');
+      if (createClickWave) createClickWave(this.x, this.y, '#58a6ff');
+      return true;
+    }
+    return false;
   }
 
   // ================= INVENTORY & ITEM MANAGEMENT =================
@@ -806,6 +1044,17 @@ export class Hero extends Entity {
       this.slowTimer -= dt;
       if (this.slowTimer <= 0) {
         this.slowRatio = 0;
+      }
+    }
+
+    // Thời gian Thiêu Đốt (Ignite)
+    if (this.igniteTimer > 0) {
+      this.igniteTimer -= dt;
+      const burnTick = (this.igniteDps || 20) * dt;
+      this.takeDamage(burnTick, this.igniteAttacker);
+      if (this.igniteTimer <= 0) {
+        this.igniteDps = 0;
+        this.igniteAttacker = null;
       }
     }
 

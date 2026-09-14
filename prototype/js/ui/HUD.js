@@ -99,6 +99,26 @@ class HUD {
     this.buffDragonStacksEl = document.getElementById('buff-dragon-stacks');
     this.buffBaronEl = document.getElementById('buff-baron');
     this.buffBaronTimerEl = document.getElementById('buff-baron-timer');
+
+    // Scoreboard Modal Elements
+    this.scoreboardModal = document.getElementById('scoreboard-modal');
+    this.sbBlueScore = document.getElementById('sb-blue-score');
+    this.sbRedScore = document.getElementById('sb-red-score');
+    this.sbBlueGold = document.getElementById('sb-blue-gold');
+    this.sbRedGold = document.getElementById('sb-red-gold');
+    this.sbBlueRows = document.getElementById('sb-blue-rows');
+    this.sbRedRows = document.getElementById('sb-red-rows');
+
+    // Victory / Defeat Modal Elements
+    this.victoryModal = document.getElementById('victory-modal');
+    this.victoryMainTitle = document.getElementById('victory-main-title');
+    this.victorySubTitle = document.getElementById('victory-sub-title');
+    this.mvpName = document.getElementById('mvp-name');
+    this.mvpAvatar = document.getElementById('mvp-avatar');
+    this.mvpStats = document.getElementById('mvp-stats');
+    this.victoryStatsBars = document.getElementById('victory-stats-bars');
+    this.btnPlayAgain = document.getElementById('btn-play-again');
+    this.activeStatsTab = 'dmg-dealt';
   }
 
   updateClock(matchTime) {
@@ -243,11 +263,31 @@ class HUD {
     });
 
     this.updateInventory(player);
+    this.updateSummonerSpells(player);
+  }
+
+  updateSummonerSpells(player) {
+    if (!player || !player.spells) return;
+    const spells = window.SPELLS || {};
+
+    ['d', 'f'].forEach(slot => {
+      const spellKey = slot.toUpperCase();
+      const spellId = player.spells[spellKey];
+      const spellDef = spells[spellId];
+      const iconEl = document.getElementById(`skill-icon-${slot}`);
+      const nameEl = document.getElementById(`skill-${slot}-name`);
+      const btnEl = document.getElementById(`btn-${slot}`);
+      if (spellDef) {
+        if (iconEl) iconEl.innerText = spellDef.icon || '⚡';
+        if (nameEl) nameEl.innerText = spellDef.name || spellKey;
+        if (btnEl) btnEl.title = `[${spellKey}] ${spellDef.name} - ${spellDef.desc}`;
+      }
+    });
   }
 
   updateCooldowns(player) {
     if (!player) return;
-    ['q', 'w', 'e', 'r', 'b'].forEach(k => {
+    ['q', 'w', 'e', 'r', 'b', 'd', 'f'].forEach(k => {
       const cdVal = player.cooldowns[k.toUpperCase()];
       const cdEl = document.getElementById(`cd-${k}`);
       if (cdEl) {
@@ -884,5 +924,206 @@ class HUD {
     if (!champ) return;
     if (this.champSelectedName) this.champSelectedName.innerText = champ.name;
     if (this.champSelectedTitle) this.champSelectedTitle.innerText = `${champ.roleBadge} - ${champ.title}`;
+  }
+
+  // ================= SCOREBOARD (TAB MODAL) =================
+  showScoreboard(heroes) {
+    if (!this.scoreboardModal) this.scoreboardModal = document.getElementById('scoreboard-modal');
+    if (!this.scoreboardModal) return;
+    this.scoreboardModal.style.display = 'flex';
+    this.updateScoreboard(heroes);
+  }
+
+  hideScoreboard() {
+    if (!this.scoreboardModal) this.scoreboardModal = document.getElementById('scoreboard-modal');
+    if (this.scoreboardModal) {
+      this.scoreboardModal.style.display = 'none';
+    }
+  }
+
+  updateScoreboard(heroes) {
+    if (!heroes || !this.scoreboardModal || this.scoreboardModal.style.display === 'none') return;
+
+    const blueHeroes = heroes.filter(h => h.team === 'blue');
+    const redHeroes = heroes.filter(h => h.team === 'red');
+
+    let blueKills = 0, redKills = 0;
+    let blueGold = 0, redGold = 0;
+
+    blueHeroes.forEach(h => {
+      blueKills += (h.kills || 0);
+      blueGold += (h.gold || 0);
+    });
+    redHeroes.forEach(h => {
+      redKills += (h.kills || 0);
+      redGold += (h.gold || 0);
+    });
+
+    if (this.sbBlueScore) this.sbBlueScore.innerText = blueKills;
+    if (this.sbRedScore) this.sbRedScore.innerText = redKills;
+    if (this.sbBlueGold) this.sbBlueGold.innerText = `${blueGold.toLocaleString()} Gold`;
+    if (this.sbRedGold) this.sbRedGold.innerText = `${redGold.toLocaleString()} Gold`;
+
+    const spellsCatalog = window.SPELLS || {};
+    const itemsCatalog = window.ITEMS || {};
+
+    const renderRows = (list) => {
+      return list.map(h => {
+        const spellDDef = spellsCatalog[h.spells && h.spells.D] || { icon: '⚡', name: 'Tốc Biến' };
+        const spellFDef = spellsCatalog[h.spells && h.spells.F] || { icon: '💚', name: 'Hồi Máu' };
+
+        let itemsHtml = '';
+        for (let i = 0; i < 6; i++) {
+          const it = h.inventory && h.inventory[i];
+          if (it) {
+            const def = itemsCatalog[it.id] || it;
+            itemsHtml += `<div class="sb-item-slot has-item" title="${def.name || it.id}">${def.icon || '⚔️'}</div>`;
+          } else {
+            itemsHtml += `<div class="sb-item-slot empty"></div>`;
+          }
+        }
+
+        const isPlayerClass = h.isPlayer ? 'sb-row-player' : '';
+        const playerBadge = h.isPlayer ? '<span class="sb-badge-player">BẠN</span>' : '';
+
+        return `
+          <div class="scoreboard-row ${isPlayerClass}">
+            <div class="sb-col-hero">
+              <div class="sb-avatar" style="background: ${h.avatarColor || '#333'}">${h.symbol || '⚔️'}</div>
+              <div class="sb-hero-info">
+                <div class="sb-name">${h.name} ${playerBadge}</div>
+                <div class="sb-lvl">Lv.${h.level || 1}</div>
+              </div>
+            </div>
+            <div class="sb-col-spells">
+              <span class="sb-spell-icon" title="[D] ${spellDDef.name}">${spellDDef.icon}</span>
+              <span class="sb-spell-icon" title="[F] ${spellFDef.name}">${spellFDef.icon}</span>
+            </div>
+            <div class="sb-col-kda">
+              <strong class="sb-k">${h.kills || 0}</strong> / <span class="sb-d">${h.deaths || 0}</span> / <span class="sb-a">${h.assists || 0}</span>
+            </div>
+            <div class="sb-col-cs">${h.cs || 0}</div>
+            <div class="sb-col-gold">${(h.gold || 0).toLocaleString()}</div>
+            <div class="sb-col-items">
+              ${itemsHtml}
+            </div>
+          </div>
+        `;
+      }).join('');
+    };
+
+    if (this.sbBlueRows) this.sbBlueRows.innerHTML = renderRows(blueHeroes);
+    if (this.sbRedRows) this.sbRedRows.innerHTML = renderRows(redHeroes);
+  }
+
+  // ================= VICTORY / DEFEAT MODAL =================
+  showVictoryModal(winningTeam, heroes, mvpHero, onPlayAgain) {
+    if (!this.victoryModal) this.victoryModal = document.getElementById('victory-modal');
+    if (!this.victoryModal) return;
+
+    const isVictory = winningTeam === 'blue';
+    const cardBox = document.getElementById('victory-card-box');
+    const mainTitle = document.getElementById('victory-main-title');
+    const subTitle = document.getElementById('victory-sub-title');
+
+    if (mainTitle) {
+      mainTitle.innerText = isVictory ? 'CHIẾN THẮNG' : 'THẤT BẠI';
+      mainTitle.className = isVictory ? 'victory-title victory-win' : 'victory-title victory-lose';
+    }
+    if (subTitle) {
+      subTitle.innerText = isVictory
+        ? 'Nhà chính đối phương đã bị phá hủy! Bạn đã dẫn dắt đội đến vinh quang!'
+        : 'Nhà chính phe ta đã sụp đổ! Hãy rút kinh nghiệm và tái xuất ở trận sau!';
+    }
+    if (cardBox) {
+      cardBox.className = isVictory ? 'victory-card card-win' : 'victory-card card-lose';
+    }
+
+    // MVP Info
+    if (mvpHero) {
+      if (this.mvpName) this.mvpName.innerText = `${mvpHero.name} ${mvpHero.isPlayer ? '(Bạn)' : ''}`;
+      if (this.mvpAvatar) {
+        this.mvpAvatar.innerText = mvpHero.symbol || '🏆';
+        this.mvpAvatar.style.background = mvpHero.avatarColor || '#ffd700';
+      }
+      if (this.mvpStats) {
+        this.mvpStats.innerText = `KDA: ${mvpHero.kills || 0}/${mvpHero.deaths || 0}/${mvpHero.assists || 0} • CS: ${mvpHero.cs || 0} • Sát Thương: ${(mvpHero.damageDealt || 0).toLocaleString()} • Vàng: ${(mvpHero.gold || 0).toLocaleString()}`;
+      }
+    }
+
+    // Tab buttons for comparison
+    const tabDealt = document.getElementById('tab-dmg-dealt');
+    const tabTaken = document.getElementById('tab-dmg-taken');
+    const tabGold = document.getElementById('tab-gold-earned');
+
+    const switchTab = (tab) => {
+      this.activeStatsTab = tab;
+      [tabDealt, tabTaken, tabGold].forEach(b => b && b.classList.remove('active'));
+      if (tab === 'dmg-dealt' && tabDealt) tabDealt.classList.add('active');
+      if (tab === 'dmg-taken' && tabTaken) tabTaken.classList.add('active');
+      if (tab === 'gold-earned' && tabGold) tabGold.classList.add('active');
+      this.renderVictoryStats(heroes, mvpHero, tab);
+    };
+
+    if (tabDealt) tabDealt.onclick = () => switchTab('dmg-dealt');
+    if (tabTaken) tabTaken.onclick = () => switchTab('dmg-taken');
+    if (tabGold) tabGold.onclick = () => switchTab('gold-earned');
+
+    this.renderVictoryStats(heroes, mvpHero, this.activeStatsTab || 'dmg-dealt');
+
+    if (this.btnPlayAgain) {
+      this.btnPlayAgain.onclick = () => {
+        this.hideVictoryModal();
+        if (onPlayAgain) onPlayAgain();
+      };
+    }
+
+    this.victoryModal.style.display = 'flex';
+  }
+
+  hideVictoryModal() {
+    if (!this.victoryModal) this.victoryModal = document.getElementById('victory-modal');
+    if (this.victoryModal) {
+      this.victoryModal.style.display = 'none';
+    }
+  }
+
+  renderVictoryStats(heroes, mvpHero, tab) {
+    const container = document.getElementById('victory-stats-bars');
+    if (!container || !heroes) return;
+
+    let maxVal = 1;
+    heroes.forEach(h => {
+      let val = 0;
+      if (tab === 'dmg-dealt') val = h.damageDealt || 0;
+      else if (tab === 'dmg-taken') val = h.damageTaken || 0;
+      else if (tab === 'gold-earned') val = h.gold || 0;
+      if (val > maxVal) maxVal = val;
+    });
+
+    container.innerHTML = heroes.map(h => {
+      let val = 0;
+      if (tab === 'dmg-dealt') val = h.damageDealt || 0;
+      else if (tab === 'dmg-taken') val = h.damageTaken || 0;
+      else if (tab === 'gold-earned') val = h.gold || 0;
+
+      const pct = Math.max(4, Math.round((val / maxVal) * 100));
+      const barClass = h.team === 'blue' ? 'bar-blue' : 'bar-red';
+      const isMvp = h === mvpHero ? '👑 MVP' : '';
+      const isPlayer = h.isPlayer ? '⭐ Bạn' : '';
+
+      return `
+        <div class="stat-bar-row ${h.isPlayer ? 'is-player' : ''} ${h === mvpHero ? 'is-mvp' : ''}">
+          <div class="stat-hero-col">
+            <div class="stat-hero-avatar" style="background: ${h.avatarColor || '#333'}">${h.symbol || '⚔️'}</div>
+            <div class="stat-hero-name">${h.name} <span class="stat-tag">${isPlayer || isMvp}</span></div>
+          </div>
+          <div class="stat-bar-wrapper">
+            <div class="stat-bar-fill ${barClass}" style="width: ${pct}%;"></div>
+            <span class="stat-bar-val">${val.toLocaleString()}</span>
+          </div>
+        </div>
+      `;
+    }).join('');
   }
 }
