@@ -49,6 +49,15 @@ class InputManager {
 
     // Mouse Down
     this.canvas.addEventListener('mousedown', (e) => {
+      const shop = document.getElementById('shop-modal');
+      if (shop && shop.style.display !== 'none' && shop.style.visibility !== 'hidden') {
+        const rect = shop.getBoundingClientRect();
+        if (e.clientX >= rect.left && e.clientX <= rect.right &&
+            e.clientY >= rect.top && e.clientY <= rect.bottom) {
+          return;
+        }
+      }
+
       this.updateWorldCoords();
 
       if (e.button === 0) {
@@ -101,6 +110,32 @@ class InputManager {
       if (e.ctrlKey && ['Q', 'W', 'E', 'R'].includes(k)) {
         e.preventDefault();
         this.game.upgradePlayerSkill(k);
+        return;
+      }
+
+      // Escape: Close shop
+      if (e.key === 'Escape') {
+        if (this.game.hud && this.game.hud.closeShop) {
+          this.game.hud.closeShop();
+        }
+        return;
+      }
+
+      // P: Toggle Shop
+      if (k === 'P') {
+        if (this.game.hud && this.game.hud.toggleShop) {
+          this.game.hud.toggleShop(this.game.player);
+        }
+        return;
+      }
+
+      // Quick item slots 1 - 6
+      if (['1', '2', '3', '4', '5', '6'].includes(e.key)) {
+        const slotIdx = parseInt(e.key, 10) - 1;
+        if (this.game.player) {
+          this.game.player.useActiveItem(slotIdx, this.game.addFloatingText ? this.game.addFloatingText.bind(this.game) : null);
+          if (this.game.hud) this.game.hud.updateInventory(this.game.player);
+        }
         return;
       }
 

@@ -16,6 +16,11 @@ export class Projectile {
     this.isTowerShot = config.isTowerShot || false;
     this.isMinionShot = config.isMinionShot || false;
     this.isBasicAttack = config.isBasicAttack || false;
+    this.isCrit = config.isCrit || false;
+    this.isSpellblade = config.isSpellblade || false;
+    this.isTornado = config.isTornado || false;
+    this.isCrystalArrow = config.isCrystalArrow || false;
+    this.isSeismicShard = config.isSeismicShard || false;
     this.isHoming = config.isHoming || false;
     this.target = config.target || null;
     this.speed = config.speed || (Math.hypot(config.vx || 0, config.vy || 0) || 850);

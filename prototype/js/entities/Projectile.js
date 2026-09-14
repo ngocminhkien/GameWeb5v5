@@ -10,7 +10,7 @@ class Projectile {
     this.vy = config.vy || 0;
     this.radius = config.radius || 8;
     this.speed = config.speed || 900;
-    this.rangeLeft = config.rangeLeft || 1000;
+    this.rangeLeft = config.rangeLeft || config.range || 1000;
 
     this.team = config.team || 'blue';
     this.damage = config.damage || 50;
@@ -21,6 +21,14 @@ class Projectile {
     this.target = config.target || null;
     this.isTowerShot = config.isTowerShot || false;
     this.isMinionShot = config.isMinionShot || false;
+    this.isBasicAttack = config.isBasicAttack || false;
+    this.isCrit = config.isCrit || false;
+    this.isSpellblade = config.isSpellblade || false;
+
+    this.isTornado = config.isTornado || false;
+    this.isCrystalArrow = config.isCrystalArrow || false;
+    this.isSeismicShard = config.isSeismicShard || false;
+    this.isVolleyArrow = config.isVolleyArrow || false;
 
     this.active = true;
   }

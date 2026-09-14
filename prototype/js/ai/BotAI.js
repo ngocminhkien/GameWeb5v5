@@ -1,6 +1,6 @@
 /**
  * OOP Bot AI Controller
- * Manages tactical decision making, laning, skillshots, kiting, retreat, and combos
+ * Manages tactical decision making, laning, skillshots, kiting, retreat, combos, and item shopping
  */
 class BotAI {
   constructor(hero) {
@@ -34,6 +34,16 @@ class BotAI {
 
     if (this.decisionTimer > 0) return;
     this.decisionTimer = 0.22; // 4 - 5 decisions per second
+
+    // Tự động mua sắm trang bị khi ở Bệ Đá Cổ
+    if (this.hero.isInFountain()) {
+      this.checkAndBuyItems(game);
+    }
+
+    // Tự động kích hoạt đồ phòng thủ khi máu thấp
+    if (this.hero.hp / this.hero.maxHp < 0.40) {
+      this.useDefensiveItems();
+    }
 
     // 2. Low HP (< 30%) -> Retreat to Base Fountain
     if (this.hero.hp / this.hero.maxHp < 0.3) {
@@ -92,5 +102,34 @@ class BotAI {
     const angle = Math.random() * Math.PI * 2;
     this.hero.targetX = waypoint.x + Math.cos(angle) * 450;
     this.hero.targetY = waypoint.y + Math.sin(angle) * 450;
+  }
+
+  checkAndBuyItems(game) {
+    const buildType = this.hero.lane === 'MID' ? 'AP' : (this.hero.lane === 'TOP' ? 'TANK' : 'AD');
+    const catalog = window.BOT_BUILD_PATHS || {};
+    const path = catalog[buildType] || catalog.AD || [];
+    const items = window.ITEMS || {};
+
+    for (let itemId of path) {
+      const alreadyHas = this.hero.inventory.some(s => s && s.id === itemId);
+      if (!alreadyHas) {
+        const itemDef = items[itemId];
+        if (itemDef && this.hero.gold >= itemDef.cost) {
+          const res = this.hero.buyItem(itemId);
+          if (res.success) {
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  useDefensiveItems() {
+    for (let i = 0; i < 6; i++) {
+      const slot = this.hero.inventory[i];
+      if (slot) {
+        this.hero.useActiveItem(i);
+      }
+    }
   }
 }

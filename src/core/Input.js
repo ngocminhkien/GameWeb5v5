@@ -21,7 +21,10 @@ export class Input {
       onSkill: null,
       onUpgradeSkill: null,
       onToggleCamera: null,
-      onRightClickMove: null
+      onRightClickMove: null,
+      onToggleShop: null,
+      onCloseShop: null,
+      onUseItem: null
     };
 
     this.initListeners();
@@ -43,7 +46,7 @@ export class Input {
     });
 
     window.addEventListener('mousedown', (e) => {
-      // Ignore if clicking minimap or HUD
+      // Ignore if clicking minimap or HUD or Shop
       const mini = document.getElementById('minimap-wrapper');
       if (mini) {
         const rect = mini.getBoundingClientRect();
@@ -56,6 +59,15 @@ export class Input {
       const hud = document.getElementById('hud');
       if (hud) {
         const rect = hud.getBoundingClientRect();
+        if (e.clientX >= rect.left && e.clientX <= rect.right &&
+            e.clientY >= rect.top && e.clientY <= rect.bottom) {
+          return;
+        }
+      }
+
+      const shop = document.getElementById('shop-modal');
+      if (shop && shop.style.display !== 'none' && shop.style.visibility !== 'hidden') {
+        const rect = shop.getBoundingClientRect();
         if (e.clientX >= rect.left && e.clientX <= rect.right &&
             e.clientY >= rect.top && e.clientY <= rect.bottom) {
           return;
@@ -98,6 +110,25 @@ export class Input {
     window.addEventListener('keydown', (e) => {
       const k = e.key.toUpperCase();
       this.keys[k] = true;
+
+      // Close Shop on Escape
+      if (e.key === 'Escape') {
+        if (this.listeners.onCloseShop) this.listeners.onCloseShop();
+        return;
+      }
+
+      // Toggle Shop on [P]
+      if (k === 'P') {
+        if (this.listeners.onToggleShop) this.listeners.onToggleShop();
+        return;
+      }
+
+      // Quick item slots [1] - [6]
+      if (['1', '2', '3', '4', '5', '6'].includes(e.key)) {
+        const slotIdx = parseInt(e.key, 10) - 1;
+        if (this.listeners.onUseItem) this.listeners.onUseItem(slotIdx);
+        return;
+      }
 
       // Ctrl + Q / W / E / R: Nâng cấp chiêu thức nhanh
       if (e.ctrlKey && ['Q', 'W', 'E', 'R'].includes(k)) {

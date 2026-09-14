@@ -18,6 +18,7 @@
       <button class="btn btn-cam-locked" id="btn-camera" onclick="window.game.camera.toggleLock(); window.game.hud.updateCameraBtn(window.game.camera.locked)">
         📷 [Y] Khóa Camera: BẬT
       </button>
+      <button class="btn btn-champ" id="btn-champ-select">🧙‍♂️ Đổi Tướng</button>
       <button class="btn active" id="btn-pve" onclick="setMode('pve')">⚔️ 5v5 PvE (Co-op vs 5 Bot)</button>
       <button class="btn" id="btn-solo" onclick="setMode('solo')">🎯 1v1 Thử Nghiệm AI</button>
       <button class="btn" onclick="window.game.initMatch()">🔄 Reset Trận Đấu</button>
@@ -59,84 +60,288 @@
 
     <!-- Bottom HUD (Progression, Economy & Skill Slots) -->
     <div id="hud">
-      <div id="hud-top-bar">
-        <div class="level-badge" id="hero-level-badge">LV 1</div>
+      <!-- Buff Badges Overlay -->
+      <div id="hud-buffs-container">
+        <div id="buff-dragon" class="hud-buff-badge buff-dragon" style="display: none;" title="Bùa Rồng Nguyên Tố">
+          <span class="buff-icon">🐲</span>
+          <span class="buff-text">Rồng x<span id="buff-dragon-stacks">0</span></span>
+        </div>
+        <div id="buff-baron" class="hud-buff-badge buff-baron" style="display: none;" title="Bùa Baron Nashor (Cường hoá Lính & Tướng)">
+          <span class="buff-icon">👾</span>
+          <span class="buff-text">Baron: <span id="buff-baron-timer">180</span>s</span>
+        </div>
+      </div>
+
+      <!-- 1. Champion Identity Hub (Left) -->
+      <div class="hud-champion-section">
+        <div class="hud-avatar-frame">
+          <div class="hud-avatar-inner" id="hero-avatar-icon">🧙‍♂️</div>
+          <div class="hud-level-badge" id="hero-level-badge">LV 1</div>
+        </div>
+        <div class="hud-stats-panel">
+          <div class="hud-stat-item" title="Sát thương vật lý (AD)"><span class="stat-icon">⚔️</span><span class="stat-val" id="hud-stat-ad">60</span></div>
+          <div class="hud-stat-item" title="Sức mạnh phép thuật (AP)"><span class="stat-icon">🔮</span><span class="stat-val" id="hud-stat-ap">0</span></div>
+          <div class="hud-stat-item" title="Giáp vật lý (Armor)"><span class="stat-icon">🛡️</span><span class="stat-val" id="hud-stat-armor">30</span></div>
+          <div class="hud-stat-item" title="Tốc độ đánh (AS)"><span class="stat-icon">⚡</span><span class="stat-val" id="hud-stat-as">0.65</span></div>
+          <div class="hud-stat-item" title="Tỉ lệ chí mạng (Crit)"><span class="stat-icon">💥</span><span class="stat-val" id="hud-stat-crit">0%</span></div>
+          <div class="hud-stat-item" title="Tốc độ di chuyển (MS)"><span class="stat-icon">👟</span><span class="stat-val" id="hud-stat-speed">340</span></div>
+        </div>
+      </div>
+
+      <div class="hud-vertical-divider"></div>
+
+      <!-- 2. Resource & Skills Core (Center) -->
+      <div class="hud-center-section">
         <div class="exp-bar-box">
           <div class="exp-bar-fill" id="exp-fill" style="width: 0%;"></div>
           <span class="exp-bar-text" id="exp-text">EXP: 0 / 240 (0%)</span>
         </div>
-        <div class="gold-badge" id="gold-badge">💰 <span id="gold-count">500</span></div>
+
+        <div class="hud-resource-bars">
+          <!-- Thanh HP & Lá Chắn Shield -->
+          <div class="hud-bar-hp">
+            <div class="hud-bar-fill hp" id="hud-hp-fill" style="width: 100%;"></div>
+            <div class="hud-bar-fill shield" id="hud-shield-fill" style="width: 0%;"></div>
+            <div class="hud-bar-content">
+              <span class="hud-bar-label">HP</span>
+              <span class="hud-bar-text" id="hud-hp-text">580 / 580</span>
+              <span class="hud-bar-regen" id="hud-hp-regen">+3.5/s</span>
+            </div>
+          </div>
+
+          <!-- Thanh Mana Năng Lượng -->
+          <div class="hud-bar-mana">
+            <div class="hud-bar-fill mana" id="hud-mana-fill" style="width: 100%;"></div>
+            <div class="hud-bar-content">
+              <span class="hud-bar-label">MP</span>
+              <span class="hud-bar-text" id="hud-mana-text">350 / 350</span>
+              <span class="hud-bar-regen" id="hud-mana-regen">+2.8/s</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Cụm Kỹ Năng Q W E R B -->
+        <div id="hud-skills-row">
+          <!-- Q -->
+          <div class="skill-slot">
+            <button class="btn-upgrade-skill" id="btn-up-q" onclick="window.game.upgradePlayerSkill('Q')" title="Nâng cấp [Ctrl+Q]">+</button>
+            <div class="skill-icon" id="skill-q-icon">
+              <span class="skill-letter">Q</span>
+              <div class="skill-cd" id="cd-q" style="display: none;">0</div>
+              <div class="skill-lock" id="lock-q">🔒</div>
+            </div>
+            <div class="skill-pips" id="pips-q">
+              <span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span>
+            </div>
+            <span class="skill-key" id="skill-q-name">Đạn Năng Lượng</span>
+          </div>
+
+          <!-- W -->
+          <div class="skill-slot">
+            <button class="btn-upgrade-skill" id="btn-up-w" onclick="window.game.upgradePlayerSkill('W')" title="Nâng cấp [Ctrl+W]">+</button>
+            <div class="skill-icon" id="skill-w-icon">
+              <span class="skill-letter">W</span>
+              <div class="skill-cd" id="cd-w" style="display: none;">0</div>
+              <div class="skill-lock" id="lock-w">🔒</div>
+            </div>
+            <div class="skill-pips" id="pips-w">
+              <span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span>
+            </div>
+            <span class="skill-key" id="skill-w-name">Hộ Thể</span>
+          </div>
+
+          <!-- E -->
+          <div class="skill-slot">
+            <button class="btn-upgrade-skill" id="btn-up-e" onclick="window.game.upgradePlayerSkill('E')" title="Nâng cấp [Ctrl+E]">+</button>
+            <div class="skill-icon" id="skill-e-icon">
+              <span class="skill-letter">E</span>
+              <div class="skill-cd" id="cd-e" style="display: none;">0</div>
+              <div class="skill-lock" id="lock-e">🔒</div>
+            </div>
+            <div class="skill-pips" id="pips-e">
+              <span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span>
+            </div>
+            <span class="skill-key" id="skill-e-name">Tốc Biến</span>
+          </div>
+
+          <!-- R -->
+          <div class="skill-slot">
+            <button class="btn-upgrade-skill" id="btn-up-r" onclick="window.game.upgradePlayerSkill('R')" title="Nâng cấp [Ctrl+R]">+</button>
+            <div class="skill-icon skill-icon-ult" id="skill-r-icon">
+              <span class="skill-letter">R</span>
+              <div class="skill-cd" id="cd-r" style="display: none;">0</div>
+              <div class="skill-lock" id="lock-r">🔒</div>
+            </div>
+            <div class="skill-pips" id="pips-r">
+              <span class="pip"></span><span class="pip"></span><span class="pip"></span>
+            </div>
+            <span class="skill-key ult-key" id="skill-r-name">Thiên Phạt</span>
+          </div>
+
+          <!-- B -->
+          <div class="skill-slot">
+            <div class="btn-upgrade-placeholder"></div>
+            <div class="skill-icon skill-icon-recall" id="skill-b-icon">
+              <span class="skill-letter">B</span>
+              <div class="skill-cd" id="cd-b" style="display: none;">0</div>
+            </div>
+            <div class="skill-pips" style="visibility: hidden;">
+              <span class="pip"></span>
+            </div>
+            <span class="skill-key">Về Tế Đàn</span>
+          </div>
+        </div>
       </div>
 
-      <div id="hud-skills-row">
-        <!-- Q -->
-        <div class="skill-slot">
-          <button class="btn-upgrade-skill" id="btn-up-q" onclick="window.game.upgradePlayerSkill('Q')" title="Nâng cấp [Ctrl+Q]">+</button>
-          <div class="skill-icon" id="skill-q-icon">
-            Q
-            <div class="skill-cd" id="cd-q" style="display: none;">0</div>
-            <div class="skill-lock" id="lock-q">🔒</div>
+      <div class="hud-vertical-divider"></div>
+
+      <!-- 3. Inventory & Economy Hub (Right) -->
+      <div class="hud-right-section">
+        <!-- Cụm 6 Ô Túi Đồ (Inventory Slots 1-6) 2x3 Grid -->
+        <div id="hud-inv-row">
+          <div class="inv-slot" id="inv-slot-0" title="Ô 1 (Trống)">
+            <span class="inv-key">1</span>
+            <div class="inv-icon"></div>
+            <div class="inv-badge" style="display: none;"></div>
+            <div class="inv-cd" id="inv-cd-0" style="display: none;">0</div>
           </div>
-          <div class="skill-pips" id="pips-q">
-            <span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span>
+          <div class="inv-slot" id="inv-slot-1" title="Ô 2 (Trống)">
+            <span class="inv-key">2</span>
+            <div class="inv-icon"></div>
+            <div class="inv-badge" style="display: none;"></div>
+            <div class="inv-cd" id="inv-cd-1" style="display: none;">0</div>
           </div>
-          <span class="skill-key">Đạn Năng Lượng</span>
+          <div class="inv-slot" id="inv-slot-2" title="Ô 3 (Trống)">
+            <span class="inv-key">3</span>
+            <div class="inv-icon"></div>
+            <div class="inv-badge" style="display: none;"></div>
+            <div class="inv-cd" id="inv-cd-2" style="display: none;">0</div>
+          </div>
+          <div class="inv-slot" id="inv-slot-3" title="Ô 4 (Trống)">
+            <span class="inv-key">4</span>
+            <div class="inv-icon"></div>
+            <div class="inv-badge" style="display: none;"></div>
+            <div class="inv-cd" id="inv-cd-3" style="display: none;">0</div>
+          </div>
+          <div class="inv-slot" id="inv-slot-4" title="Ô 5 (Trống)">
+            <span class="inv-key">5</span>
+            <div class="inv-icon"></div>
+            <div class="inv-badge" style="display: none;"></div>
+            <div class="inv-cd" id="inv-cd-4" style="display: none;">0</div>
+          </div>
+          <div class="inv-slot" id="inv-slot-5" title="Ô 6 (Trống)">
+            <span class="inv-key">6</span>
+            <div class="inv-icon"></div>
+            <div class="inv-badge" style="display: none;"></div>
+            <div class="inv-cd" id="inv-cd-5" style="display: none;">0</div>
+          </div>
         </div>
 
-        <!-- W -->
-        <div class="skill-slot">
-          <button class="btn-upgrade-skill" id="btn-up-w" onclick="window.game.upgradePlayerSkill('W')" title="Nâng cấp [Ctrl+W]">+</button>
-          <div class="skill-icon" id="skill-w-icon">
-            W
-            <div class="skill-cd" id="cd-w" style="display: none;">0</div>
-            <div class="skill-lock" id="lock-w">🔒</div>
+        <div class="hud-economy-bar">
+          <div class="gold-badge" id="gold-badge">💰 <span id="gold-count">500</span></div>
+          <button id="btn-open-shop" class="btn-shop">🛒 Cửa Hàng [P]</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL CỬA HÀNG TRANG BỊ BỆ ĐÁ CỔ -->
+    <div id="shop-modal" style="display: none;">
+      <div class="shop-header">
+        <div class="shop-title">
+          <span>🛒</span>
+          <h2>CỬA HÀNG TRANG BỊ BỆ ĐÁ CỔ</h2>
+          <span class="shop-title-badge">CẤP 1 - 2 - 3</span>
+        </div>
+        <div class="shop-header-status">
+          <div id="shop-fountain-status" class="fountain-status in">🟢 Đang ở Bệ Đá Cổ</div>
+          <div class="shop-gold">💰 <span id="shop-gold-count">500</span></div>
+          <button id="btn-close-shop" class="btn-close-shop" title="Đóng [Esc]">✕</button>
+        </div>
+      </div>
+
+      <div class="shop-body">
+        <!-- Cột Danh mục & Cấp bậc trang bị -->
+        <div class="shop-sidebar">
+          <div class="shop-sidebar-title">CẤP ĐỘ / TIER</div>
+          <div class="shop-tier-group">
+            <button class="shop-tier-tab active" data-tier="all">Tất Cả</button>
+            <button class="shop-tier-tab" data-tier="1">Cấp 1</button>
+            <button class="shop-tier-tab" data-tier="2">Cấp 2</button>
+            <button class="shop-tier-tab" data-tier="3">Cấp 3</button>
           </div>
-          <div class="skill-pips" id="pips-w">
-            <span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span>
-          </div>
-          <span class="skill-key">Hộ Thể</span>
+
+          <div class="shop-sidebar-title">HỆ TRANG BỊ</div>
+          <button class="shop-tab active" data-category="all">🌐 Tất Cả</button>
+          <button class="shop-tab" data-category="damage">🗡️ Sát Thương</button>
+          <button class="shop-tab" data-category="magic">🔮 Phép Thuật</button>
+          <button class="shop-tab" data-category="defense">🛡️ Phòng Thủ</button>
+          <button class="shop-tab" data-category="boots">🥾 Giày Cơ Động</button>
+          <button class="shop-tab" data-category="consumable">🧪 Kích Hoạt / Máu</button>
         </div>
 
-        <!-- E -->
-        <div class="skill-slot">
-          <button class="btn-upgrade-skill" id="btn-up-e" onclick="window.game.upgradePlayerSkill('E')" title="Nâng cấp [Ctrl+E]">+</button>
-          <div class="skill-icon" id="skill-e-icon">
-            E
-            <div class="skill-cd" id="cd-e" style="display: none;">0</div>
-            <div class="skill-lock" id="lock-e">🔒</div>
+        <!-- Cột Danh sách các trang bị -->
+        <div class="shop-catalog-panel">
+          <div class="shop-catalog-title">DANH SÁCH TRANG BỊ (Nhấp đúp để mua nhanh)</div>
+          <div id="shop-item-grid" class="shop-item-grid">
+            <!-- Nạp động bằng HUD.js -->
           </div>
-          <div class="skill-pips" id="pips-e">
-            <span class="pip"></span><span class="pip"></span><span class="pip"></span><span class="pip"></span>
-          </div>
-          <span class="skill-key">Tốc Biến</span>
         </div>
 
-        <!-- R -->
-        <div class="skill-slot">
-          <button class="btn-upgrade-skill" id="btn-up-r" onclick="window.game.upgradePlayerSkill('R')" title="Nâng cấp [Ctrl+R]">+</button>
-          <div class="skill-icon" id="skill-r-icon">
-            R
-            <div class="skill-cd" id="cd-r" style="display: none;">0</div>
-            <div class="skill-lock" id="lock-r">🔒</div>
-          </div>
-          <div class="skill-pips" id="pips-r">
-            <span class="pip"></span><span class="pip"></span><span class="pip"></span>
-          </div>
-          <span class="skill-key">Thiên Phạt</span>
-        </div>
+        <!-- Cột Chi tiết trang bị đã chọn, Công thức & Bán đồ -->
+        <div class="shop-preview-panel">
+          <div>
+            <div class="shop-preview-header">CHI TIẾT TRANG BỊ</div>
+            <div class="preview-pedestal">
+              <div id="shop-preview-icon" class="preview-big-icon">🗡️</div>
+              <div id="shop-preview-name" class="preview-item-name">Kiếm Dài</div>
+              <div id="shop-preview-cost" class="preview-item-cost">💰 350 Vàng</div>
+            </div>
+            <div id="shop-preview-desc" class="preview-item-desc">+15 Sát Thương Vật Lý</div>
+            
+            <!-- Nhánh công thức ghép đồ -->
+            <div id="shop-recipe-container"></div>
+            <!-- Nhánh các món có thể nâng cấp lên -->
+            <div id="shop-builds-into-container"></div>
 
-        <!-- B -->
-        <div class="skill-slot">
-          <div class="btn-upgrade-placeholder"></div>
-          <div class="skill-icon" id="skill-b-icon">
-            B
-            <div class="skill-cd" id="cd-b" style="display: none;">0</div>
+            <button id="btn-shop-buy" class="btn-shop-buy">MUA (350 💰)</button>
           </div>
-          <div class="skill-pips" style="visibility: hidden;">
-            <span class="pip"></span>
+
+          <div class="shop-inventory-section">
+            <div class="shop-inventory-title">TÚI ĐỒ (Chọn để bán hoàn 70%)</div>
+            <div class="shop-inv-grid">
+              <div class="shop-inv-slot" id="shop-inv-0"></div>
+              <div class="shop-inv-slot" id="shop-inv-1"></div>
+              <div class="shop-inv-slot" id="shop-inv-2"></div>
+              <div class="shop-inv-slot" id="shop-inv-3"></div>
+              <div class="shop-inv-slot" id="shop-inv-4"></div>
+              <div class="shop-inv-slot" id="shop-inv-5"></div>
+            </div>
+            <button id="btn-shop-sell" class="btn-shop-sell" disabled>Bán Trang Bị</button>
           </div>
-          <span class="skill-key">Về Tế Đàn</span>
         </div>
+      </div>
+    </div>
+
+    <!-- MODAL CHỌN TƯỚNG HEXTECH -->
+    <div id="champ-select-modal" style="display: none;">
+      <div class="shop-header" style="border-bottom: 1.5px solid #d29922;">
+        <div class="shop-title" style="color: #ffd700;">
+          <span>🧙‍♂️</span>
+          <h2 style="color: #ffd700; text-shadow: 0 0 8px rgba(255, 215, 0, 0.5);">BẢNG CHỌN ANH HÙNG CHIẾN ĐẤU</h2>
+          <span class="shop-title-badge" style="background: rgba(210, 153, 34, 0.2); border-color: #d29922; color: #ffd700;">4 ARCHETYPES</span>
+        </div>
+        <button id="btn-close-champ-select" class="btn-close-shop" title="Đóng [Esc]">✕</button>
+      </div>
+
+      <div class="champ-grid" id="champ-cards-container">
+        <!-- Nạp động bởi HUD.js -->
+      </div>
+
+      <div class="champ-select-footer">
+        <div style="font-size: 13px; color: #8b949e;">
+          Đang chọn: <strong id="champ-selected-name" style="color: #ffd700; font-size: 15px;">Valhein</strong> - <span id="champ-selected-title" style="color: #c9d1d9;">Pháp Sư Tinh Anh</span>
+        </div>
+        <button id="btn-lock-champ" class="btn-lock-champ">⚔️ XÁC NHẬN CHỌN TƯỚNG</button>
       </div>
     </div>
 
@@ -152,6 +357,8 @@
   <script src="js/config/TerrainData.js"></script>
   <script src="js/config/TowersData.js"></script>
   <script src="js/config/MonstersData.js"></script>
+  <script src="js/config/ItemsData.js"></script>
+  <script src="js/config/ChampionsData.js"></script>
 
   <!-- 2. OOP Entity Hierarchy (Base Entity -> Concrete Entities) -->
   <script src="js/entities/Entity.js"></script>

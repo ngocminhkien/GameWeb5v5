@@ -53,6 +53,38 @@ export class Minion extends Entity {
     this.hp = this.maxHp;
     this.attackCooldown = 0;
     this.target = null;
+
+    // Base stats backup for Baron Empowerment
+    this.baseRadius = this.radius;
+    this.baseDamage = this.damage;
+    this.baseRange = this.range;
+    this.isBaronEmpowered = false;
+    this.baronPulse = 0;
+  }
+
+  applyBaronBuff(empower) {
+    if (empower && !this.isBaronEmpowered) {
+      this.isBaronEmpowered = true;
+      this.radius = Math.round(this.baseRadius * 1.35);
+      if (this.type === 'MELEE') {
+        this.damage = Math.round(this.baseDamage * 1.6);
+        this.hp = Math.min(this.maxHp + 350, this.hp + 350);
+        this.maxHp += 350;
+      } else if (this.type === 'RANGED') {
+        this.damage = Math.round(this.baseDamage * 1.8);
+        this.range = 800;
+      } else if (this.type === 'CANNON') {
+        this.damage = Math.round(this.baseDamage * 2.2);
+        this.range = 920; // Vượt tầm bắn của trụ (750) để nã pháo công thành!
+      } else if (this.type === 'SUPER') {
+        this.damage = Math.round(this.baseDamage * 1.5);
+      }
+    } else if (!empower && this.isBaronEmpowered) {
+      this.isBaronEmpowered = false;
+      this.radius = this.baseRadius;
+      this.damage = this.baseDamage;
+      this.range = this.baseRange;
+    }
   }
 
   takeDamage(amount, source, addFloatingText, onDie = null) {
@@ -61,6 +93,11 @@ export class Minion extends Entity {
     // Cannon minions take 30% reduced damage from towers
     if (this.isCannon && source && source.isTowerShot) {
       amount *= 0.7;
+    }
+
+    // Baron Empowered minions take 45% reduced damage from champions & towers
+    if (this.isBaronEmpowered) {
+      amount *= 0.55;
     }
 
     this.hp -= amount;
@@ -223,14 +260,30 @@ export class Minion extends Entity {
     // Culling
     if (sx < -100 || sx > ctx.canvas.width + 100 || sy < -100 || sy > ctx.canvas.height + 100) return;
 
+    // 0. Baron Empowerment Aura Ring
+    if (this.isBaronEmpowered) {
+      this.baronPulse = ((this.baronPulse || 0) + 0.05) % (Math.PI * 2);
+      const pulseSize = this.radius + 6 + Math.sin(this.baronPulse) * 3;
+      ctx.beginPath();
+      ctx.arc(sx, sy, pulseSize, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(163, 113, 247, 0.85)';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(sx, sy, this.radius + 3, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(137, 87, 229, 0.2)';
+      ctx.fill();
+    }
+
     // 1. Thân Token Lính
     ctx.beginPath();
     ctx.arc(sx, sy, this.radius, 0, Math.PI * 2);
     ctx.fillStyle = this.team === 'blue' ? '#1f6feb' : '#da3633';
     ctx.fill();
 
-    ctx.strokeStyle = this.isSuper ? '#f0883e' : (this.isCannon ? '#d29922' : '#ffffff');
-    ctx.lineWidth = this.isSuper ? 3.5 : 2;
+    ctx.strokeStyle = this.isBaronEmpowered ? '#a371f7' : (this.isSuper ? '#f0883e' : (this.isCannon ? '#d29922' : '#ffffff'));
+    ctx.lineWidth = (this.isSuper || this.isBaronEmpowered) ? 3.5 : 2;
     ctx.stroke();
 
     // 2. Biểu tượng lính

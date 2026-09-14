@@ -73,6 +73,11 @@ export class Renderer {
       }
     }
 
+    // 10.5. Tường gió Wind Walls
+    if (game.windWalls) {
+      this.drawWindWalls(game.windWalls, camera);
+    }
+
     // 11. Đạn bay - Ẩn đạn địch ngoài tầm nhìn
     for (let p of game.projectiles) {
       if (p.team === 'blue' || !game.fogOfWar || game.fogOfWar.isVisible(p.x, p.y, p.radius, false, alliedVision)) {
@@ -272,6 +277,40 @@ export class Renderer {
       ctx.strokeStyle = w.color;
       ctx.globalAlpha = w.alpha;
       ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  drawWindWalls(windWalls, camera) {
+    const ctx = this.ctx;
+    for (let ww of windWalls) {
+      const sx = ww.x - camera.x;
+      const sy = ww.y - camera.y;
+      const perp = ww.angle + Math.PI / 2;
+      const halfLen = (ww.length || 220) / 2;
+      const x1 = sx - Math.cos(perp) * halfLen;
+      const y1 = sy - Math.sin(perp) * halfLen;
+      const x2 = sx + Math.cos(perp) * halfLen;
+      const y2 = sy + Math.sin(perp) * halfLen;
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.lineWidth = 14;
+      ctx.strokeStyle = ww.team === 'blue' ? 'rgba(46, 160, 67, 0.75)' : 'rgba(248, 81, 73, 0.75)';
+      ctx.lineCap = 'round';
+      ctx.shadowColor = ww.team === 'blue' ? '#3fb950' : '#f85149';
+      ctx.shadowBlur = 18;
+      ctx.stroke();
+
+      // Inner white gust line
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = '#ffffff';
       ctx.stroke();
       ctx.restore();
     }
