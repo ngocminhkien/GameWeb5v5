@@ -29,6 +29,7 @@ class Projectile {
     this.isCrystalArrow = config.isCrystalArrow || false;
     this.isSeismicShard = config.isSeismicShard || false;
     this.isVolleyArrow = config.isVolleyArrow || false;
+    this.isStarOrb = config.isStarOrb || false;
 
     this.active = true;
   }

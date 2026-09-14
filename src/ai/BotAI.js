@@ -135,12 +135,33 @@ export class BotAI {
       }
     }
 
+    // D. Lumina (support): Khúc Ca Tinh Vân (R) mở giao tranh hoặc giải cứu đồng minh
+    if (this.hero.championId === 'support' && this.hero.cooldowns.R === 0) {
+      const nearbyEnemies = enemies.filter(e => Math.hypot(e.x - this.hero.x, e.y - this.hero.y) <= 650);
+      const lowAlly = allies.find(a => a.hp / a.maxHp < 0.40 && Math.hypot(a.x - this.hero.x, a.y - this.hero.y) <= 650);
+      if (nearbyEnemies.length >= 2 || lowAlly) {
+        this.hero.castUltimate(game.heroes, game.towers, game.monsters, clickWave, floatText, (deadTarget, killer) => {
+          if (game.distributeRewards) game.distributeRewards(deadTarget, killer, 300, 300);
+        }, game.projectiles);
+      }
+    }
+
+    // E. Garen (fighter): Công Lý Demacia (R) kết liễu tướng địch yếu máu (< 35% HP)
+    if (this.hero.championId === 'fighter' && this.hero.cooldowns.R === 0) {
+      const executeTarget = enemies.find(e => (e.hp / e.maxHp) <= 0.35 && Math.hypot(e.x - this.hero.x, e.y - this.hero.y) <= 500);
+      if (executeTarget) {
+        this.hero.castUltimate(game.heroes, game.towers, game.monsters, clickWave, floatText, (deadTarget, killer) => {
+          if (game.distributeRewards) game.distributeRewards(deadTarget, killer, 300, 300);
+        }, game.projectiles);
+      }
+    }
+
     // 4. GIAO TRANH TƯỚNG ĐỊCH
     if (closestEnemy && minEnemyDist < 850) {
       this.hero.facingAngle = Math.atan2(closestEnemy.y - this.hero.y, closestEnemy.x - this.hero.x);
 
       // Kiting / Giữ cự ly
-      if (this.hero.championId === 'adc' || this.hero.championId === 'mage') {
+      if (this.hero.championId === 'adc' || this.hero.championId === 'mage' || this.hero.championId === 'support') {
         if (minEnemyDist < 380) {
           const away = Math.atan2(this.hero.y - closestEnemy.y, this.hero.x - closestEnemy.x);
           this.hero.targetX = this.hero.x + Math.cos(away) * 160;
@@ -154,9 +175,9 @@ export class BotAI {
         this.hero.targetY = closestEnemy.y;
       }
 
-      // Kỹ năng Q & W & R
+      // Kỹ năng Q & W & E & R
       if (this.hero.cooldowns.W === 0) {
-        this.hero.castShield(floatText);
+        this.hero.castShield(floatText, game.heroes);
       }
 
       if (this.hero.cooldowns.Q === 0) {
@@ -165,10 +186,33 @@ export class BotAI {
         this.hero.castSkillshot(leadX, leadY, game.projectiles, floatText);
       }
 
-      if (this.hero.cooldowns.R === 0 && closestEnemy.hp < 450) {
-        this.hero.castUltimate(game.heroes, game.towers, game.monsters, clickWave, floatText, (deadTarget, killer) => {
-          if (game.distributeRewards) game.distributeRewards(deadTarget, killer, 300, 300);
-        }, game.projectiles);
+      if (this.hero.cooldowns.E === 0) {
+        if (this.hero.championId === 'fighter' && minEnemyDist <= 320) {
+          this.hero.castDash(closestEnemy.x, closestEnemy.y, walls, floatText, enemies, allies);
+        } else if (this.hero.championId === 'support') {
+          const needHeal = allies.some(a => a.hp / a.maxHp < 0.70 && Math.hypot(a.x - this.hero.x, a.y - this.hero.y) <= 450) || (this.hero.hp / this.hero.maxHp < 0.70);
+          if (needHeal) {
+            this.hero.castDash(this.hero.x, this.hero.y, walls, floatText, enemies, allies);
+          }
+        }
+      }
+
+      if (this.hero.cooldowns.R === 0) {
+        if (this.hero.championId === 'fighter') {
+          if (closestEnemy.hp / closestEnemy.maxHp < 0.35 || closestEnemy.hp < 600) {
+            this.hero.castUltimate(game.heroes, game.towers, game.monsters, clickWave, floatText, (deadTarget, killer) => {
+              if (game.distributeRewards) game.distributeRewards(deadTarget, killer, 300, 300);
+            }, game.projectiles);
+          }
+        } else if (this.hero.championId === 'support') {
+          if (minEnemyDist <= 550) {
+            this.hero.castUltimate(game.heroes, game.towers, game.monsters, clickWave, floatText, null, game.projectiles);
+          }
+        } else if (closestEnemy.hp < 450) {
+          this.hero.castUltimate(game.heroes, game.towers, game.monsters, clickWave, floatText, (deadTarget, killer) => {
+            if (game.distributeRewards) game.distributeRewards(deadTarget, killer, 300, 300);
+          }, game.projectiles);
+        }
       }
 
       this.hero.attackTarget = closestEnemy;
@@ -264,7 +308,10 @@ export class BotAI {
 
   checkAndBuyItems(game) {
     let buildType = 'AD';
-    if (this.hero.lane === 'MID' || this.hero.championId === 'mage') buildType = 'AP';
+    if (this.hero.lane === 'JUNGLE') buildType = 'JUNGLE';
+    else if (this.hero.championId === 'support' || (this.hero.lane === 'BOT' && this.hero.championId !== 'adc')) buildType = 'SUPPORT';
+    else if (this.hero.championId === 'fighter') buildType = 'FIGHTER';
+    else if (this.hero.lane === 'MID' || this.hero.championId === 'mage') buildType = 'AP';
     else if (this.hero.lane === 'TOP' || this.hero.championId === 'tank') buildType = 'TANK';
 
     const path = BOT_BUILD_PATHS[buildType] || BOT_BUILD_PATHS.AD;

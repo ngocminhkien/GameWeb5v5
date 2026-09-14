@@ -21,6 +21,7 @@ export class Projectile {
     this.isTornado = config.isTornado || false;
     this.isCrystalArrow = config.isCrystalArrow || false;
     this.isSeismicShard = config.isSeismicShard || false;
+    this.isStarOrb = config.isStarOrb || false;
     this.isHoming = config.isHoming || false;
     this.target = config.target || null;
     this.speed = config.speed || (Math.hypot(config.vx || 0, config.vy || 0) || 850);

@@ -289,5 +289,146 @@ window.CHAMPIONS = {
         damage: [400, 600, 820]
       }
     }
+  },
+
+  support: {
+    id: 'support',
+    name: 'Lumina',
+    title: 'Tinh Nữ Thần Ánh Sáng',
+    role: 'Hỗ Trợ / Bảo Hộ',
+    roleEn: 'Support',
+    roleBadge: '🌟 HỖ TRỢ',
+    symbol: '🌟',
+    avatarColor: '#ec4899',
+    themeColor: '#f472b6',
+    description: 'Bảo mẫu ánh sáng toàn năng, tạo khiên toàn đội, hồi máu diện rộng và câm lặng kẻ địch trong vùng Tinh Vân.',
+    difficulty: 1,
+    ratings: { damage: 55, defense: 75, mobility: 70 },
+    baseStats: {
+      hp: 1350,
+      mana: 750,
+      attackDamage: 65,
+      abilityPower: 35,
+      armor: 26,
+      speed: 410,
+      attackRange: 560,
+      attackSpeed: 0.88,
+      hpRegen: 14,
+      manaRegen: 25
+    },
+    skills: {
+      passive: {
+        name: 'Dòng Chảy Ánh Sáng',
+        icon: '✨',
+        desc: 'Mỗi khi tung kỹ năng, Lumina và tướng đồng minh gần nhất nhận thêm +25% Tốc độ di chuyển trong 2.5 giây.'
+      },
+      Q: {
+        name: 'Tinh Cầu Ánh Sáng',
+        icon: '🌟',
+        desc: 'Bắn một quả cầu sao băng phát nổ tại điểm đích, gây 140/190/240/290 (+60% AP) sát thương phép và LÀM CHOÁNG 1.2s diện rộng.',
+        cd: [4.0, 3.5, 3.0, 2.5],
+        mana: [45, 50, 55, 60],
+        speed: 1000,
+        range: 1100,
+        radius: 18,
+        damage: [140, 190, 240, 290]
+      },
+      W: {
+        name: 'Hộ Mệnh Tinh Tú',
+        icon: '🛡️',
+        desc: 'Ban phát lớp lá chắn ma thuật 200/280/360/440 (+50% AP) cho bản thân và TOÀN BỘ TƯỚNG ĐỒNG MINH trong bán kính 600 đơn vị trong 3.5 giây.',
+        cd: [8.0, 7.2, 6.4, 5.5],
+        mana: [55, 60, 65, 70],
+        shield: [200, 280, 360, 440],
+        radius: 600
+      },
+      E: {
+        name: 'Suối Nguồn Phục Hồi',
+        icon: '💚',
+        desc: 'Triệu hồi suối nguồn ánh sáng lập tức HỒI PHỤC 160/240/320/400 (+55% AP) Máu cho bản thân và đồng minh có % máu thấp nhất trong tầm 450 đơn vị.',
+        cd: [7.5, 6.8, 6.0, 5.2],
+        mana: [50, 55, 60, 65],
+        heal: [160, 240, 320, 400],
+        range: 450
+      },
+      R: {
+        name: 'Khúc Ca Tinh Vân',
+        icon: '🌌',
+        desc: 'Triệu hồi vùng ma trận Tinh Vân cực lớn (bán kính 650) trong 4s: Gây 350/500/650 (+70% AP) sát thương, CÂM LẶNG 1.5s và làm chậm 50% kẻ địch; đồng minh được hồi máu 80 HP/s!',
+        cd: [40, 32, 25],
+        mana: [100, 115, 130],
+        damage: [350, 500, 650],
+        radius: 650
+      }
+    }
+  },
+
+  fighter: {
+    id: 'fighter',
+    name: 'Garen',
+    title: 'Dũng Kiếm Demacia',
+    role: 'Đấu Sĩ / Càn Quét',
+    roleEn: 'Fighter',
+    roleBadge: '🗡️ ĐẤU SĨ',
+    symbol: '🗡️',
+    avatarColor: '#1f6feb',
+    themeColor: '#388bfd',
+    description: 'Chiến binh quả cảm càn quét mọi mặt trận, câm lặng đối thủ, xoay kiếm bão táp xé giáp và kết liễu bằng Sát Thương Chuẩn khổng lồ.',
+    difficulty: 1,
+    ratings: { damage: 85, defense: 85, mobility: 65 },
+    baseStats: {
+      hp: 1680,
+      mana: 400,
+      attackDamage: 86,
+      abilityPower: 0,
+      armor: 42,
+      speed: 425,
+      attackRange: 220,
+      attackSpeed: 0.90,
+      hpRegen: 18,
+      manaRegen: 10
+    },
+    skills: {
+      passive: {
+        name: 'Ý Chí Kiên Cường',
+        icon: '🛡️',
+        desc: 'Khi không chịu sát thương trong 6s, hồi phục 2.5% Máu tối đa mỗi giây. Nhận thêm 10% giảm sát thương gánh chịu nội tại.'
+      },
+      Q: {
+        name: 'Đòn Quyết Định',
+        icon: '🗡️',
+        desc: 'Hóa giải mọi hiệu ứng làm chậm và tăng +40% Tốc chạy trong 3 giây. Đòn đánh cận chiến kế tiếp gây 160/230/300/370 (+120% AD) sát thương và CÂM LẶNG 1.5 giây!',
+        cd: [4.5, 4.0, 3.5, 3.0],
+        mana: [20, 20, 20, 20],
+        speedBoost: 0.40,
+        damage: [160, 230, 300, 370]
+      },
+      W: {
+        name: 'Lòng Dũng Cảm',
+        icon: '🔰',
+        desc: 'Kích hoạt nhận lá chắn 200/300/400/500 (+15% Máu tối đa) và GIẢM 40% toàn bộ sát thương nhận vào trong 3.5 giây.',
+        cd: [9.0, 8.0, 7.0, 6.0],
+        mana: [30, 30, 30, 30],
+        shield: [200, 300, 400, 500]
+      },
+      E: {
+        name: 'Phán Quyết Bão Kiếm',
+        icon: '⚔️',
+        desc: 'Xoay cự kiếm liên hoàn trong 3 giây (di chuyển tự do xuyên vật thể), gây 6 đợt sát thương xung quanh (mỗi đợt 45/65/85/105 + 35% AD) và xé giảm 25% Giáp kẻ địch!',
+        cd: [6.0, 5.2, 4.4, 3.6],
+        mana: [35, 35, 35, 35],
+        range: 320,
+        tickDamage: [45, 65, 85, 105]
+      },
+      R: {
+        name: 'Công Lý Demacia',
+        icon: '👑',
+        desc: 'Triệu hồi Cự Kiếm Hoàng Kim từ trời giáng xuống kết liễu kẻ địch trong tầm 500px, gây SÁT THƯƠNG CHUẨN: 250/400/550 + 30% Máu đã mất của mục tiêu!',
+        cd: [35, 28, 20],
+        mana: [80, 90, 100],
+        range: 500,
+        damage: [250, 400, 550]
+      }
+    }
   }
 };

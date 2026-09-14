@@ -690,5 +690,40 @@ export const BOT_BUILD_PATHS = {
     'warmog',
     'spirit_visage',
     'solari'
+  ],
+  SUPPORT: [
+    'boots_basic',
+    'amplifying_tome',
+    'ruby_crystal',
+    'plated_steelcaps',
+    'lost_chapter',
+    'solari',
+    'rylais_scepter',
+    'zhonya',
+    'spirit_visage',
+    'rabadon'
+  ],
+  FIGHTER: [
+    'boots_basic',
+    'long_sword',
+    'ruby_crystal',
+    'plated_steelcaps',
+    'bamis_cinder',
+    'sunfire_aegis',
+    'infinity_edge',
+    'thornmail',
+    'immortal_shieldbow',
+    'guardian_angel'
+  ],
+  JUNGLE: [
+    'boots_basic',
+    'long_sword',
+    'vampiric_scepter',
+    'berserker_greaves',
+    'youmuu',
+    'infinity_edge',
+    'immortal_shieldbow',
+    'bloodthirster',
+    'guardian_angel'
   ]
 };

@@ -128,6 +128,7 @@ export class Hero extends Entity {
     this.slowTimer = 0;
     this.knockupTimer = 0;
     this.stunTimer = 0;
+    this.silenceTimer = 0;
     this.dragonStacks = 0;
     this.hasDragonSoul = false;
     this.dragonSoulCooldown = 0;
@@ -142,6 +143,12 @@ export class Hero extends Entity {
     this.asDebuffTimer = 0;
     this.attackSpeedDebuff = 0;
     this.spawnWindWall = null; // Yasuo W
+    this.garenQTimer = 0; // Garen Q speed & silence on next hit
+    this.garenWTimer = 0; // Garen W 40% damage reduction
+    this.garenSpinTimer = 0; // Garen E Judgment spin
+    this.garenSpinTickTimer = 0;
+    this.outOfCombatTimer = 0; // Garen Passive out-of-combat regen
+    this.cosmicZone = null; // Lumina R cosmic silence field
 
     this.respawnTimer = 0;
     this.inBush = false;
@@ -190,6 +197,13 @@ export class Hero extends Entity {
     this.rangersFocusTimer = 0;
     this.thunderclapTimer = 0;
     this.graniteTimer = 0;
+    this.garenQTimer = 0;
+    this.garenWTimer = 0;
+    this.garenSpinTimer = 0;
+    this.garenSpinTickTimer = 0;
+    this.outOfCombatTimer = 0;
+    this.cosmicZone = null;
+    this.silenceTimer = 0;
 
     this.recalculateStats();
     this.hp = this.maxHp;
@@ -305,7 +319,8 @@ export class Hero extends Entity {
   }
 
   castSummonerSpell(slot, targetX, targetY, heroes = [], minions = [], monsters = [], walls = [], addFloatingText = null, createClickWave = null, projectiles = []) {
-    if (!this.alive || this.isStasis || this.isReviving || this.stunTimer > 0 || this.knockupTimer > 0) {
+    if (!this.alive || this.isStasis || this.isReviving || this.stunTimer > 0 || this.knockupTimer > 0 || this.silenceTimer > 0) {
+      if (this.isPlayer && addFloatingText && this.silenceTimer > 0) addFloatingText('🤐 Đang bị CÂM LẶNG!', this.x, this.y - 35, '#ff7b72');
       return false;
     }
     const spellKey = this.spells ? this.spells[slot] : null;
@@ -882,6 +897,15 @@ export class Hero extends Entity {
     const reductionMultiplier = 100 / (100 + armorVal);
     amount = Math.max(1, amount * reductionMultiplier);
 
+    // Garen Passive 10% innate damage reduction & Garen W 40% damage reduction
+    if (this.championId === 'fighter') {
+      amount *= 0.90;
+    }
+    if (this.garenWTimer > 0) {
+      amount *= 0.60;
+    }
+    this.outOfCombatTimer = 0;
+
     // Phản đòn Giáp Gai (Thornmail / Brambles Vest)
     if (this.hasThornmail && source && source.alive && source !== this && !source.isTowerShot) {
       const reflected = Math.round(amount * (this.thornRatio || 0.20));
@@ -965,6 +989,11 @@ export class Hero extends Entity {
     this.hp = this.maxHp;
     this.mana = this.maxMana;
     this.shield = 0;
+    this.silenceTimer = 0;
+    this.garenQTimer = 0;
+    this.garenWTimer = 0;
+    this.garenSpinTimer = 0;
+    this.cosmicZone = null;
     const base = this.team === 'blue' ? CONSTANTS.BLUE_BASE : CONSTANTS.RED_BASE;
     this.x = base.x + (Math.random() * 200 - 100);
     this.y = base.y + (Math.random() * 200 - 100);
@@ -1055,6 +1084,22 @@ export class Hero extends Entity {
       if (this.igniteTimer <= 0) {
         this.igniteDps = 0;
         this.igniteAttacker = null;
+      }
+    }
+
+    // Thời gian Câm Lặng (Silence)
+    if (this.silenceTimer > 0) this.silenceTimer = Math.max(0, this.silenceTimer - dt);
+
+    // Thời gian kỹ năng Garen
+    if (this.garenQTimer > 0) this.garenQTimer = Math.max(0, this.garenQTimer - dt);
+    if (this.garenWTimer > 0) this.garenWTimer = Math.max(0, this.garenWTimer - dt);
+    if (this.garenSpinTimer > 0) this.garenSpinTimer = Math.max(0, this.garenSpinTimer - dt);
+
+    // Nội tại Garen - Hồi phục ngoài giao tranh (2.5% Max HP/s sau 6s)
+    if (this.championId === 'fighter') {
+      this.outOfCombatTimer = (this.outOfCombatTimer || 0) + dt;
+      if (this.outOfCombatTimer >= 6.0 && this.hp < this.maxHp) {
+        this.hp = Math.min(this.maxHp, this.hp + (this.maxHp * 0.025) * dt);
       }
     }
 
@@ -1159,6 +1204,18 @@ export class Hero extends Entity {
       finalDamage += Math.round(30 + this.abilityPower * 0.20);
     }
 
+    let isGarenQ = false;
+    if (this.garenQTimer > 0) {
+      const qRank = Math.max(1, this.skillRanks.Q);
+      const qDmg = [160, 230, 300, 370][qRank - 1] + Math.round(this.attackDamage * 1.20);
+      finalDamage += qDmg;
+      if (target.silenceTimer !== undefined) {
+        target.silenceTimer = 1.5;
+      }
+      this.garenQTimer = 0;
+      isGarenQ = true;
+    }
+
     projectiles.push(new Projectile({
       x: this.x + Math.cos(angle) * (this.radius + 8),
       y: this.y + Math.sin(angle) * (this.radius + 8),
@@ -1201,8 +1258,9 @@ export class Hero extends Entity {
 
   // ================= SKILLS (ALL 4 CHAMPIONS) =================
   castSkillshot(targetX, targetY, projectiles, addFloatingText = null) {
-    if (this.skillRanks.Q <= 0 || this.isStasis || this.isReviving || this.stunTimer > 0 || this.knockupTimer > 0) {
+    if (this.skillRanks.Q <= 0 || this.isStasis || this.isReviving || this.stunTimer > 0 || this.knockupTimer > 0 || this.silenceTimer > 0) {
       if (this.isPlayer && addFloatingText && this.skillRanks.Q <= 0) addFloatingText('⚠️ Chưa học chiêu Q! Nhấn [+] để mở', this.x, this.y - 35, '#ff7b72');
+      if (this.isPlayer && addFloatingText && this.silenceTimer > 0) addFloatingText('🤐 Đang bị CÂM LẶNG!', this.x, this.y - 35, '#ff7b72');
       return;
     }
     const rankIdx = this.skillRanks.Q - 1;
@@ -1313,12 +1371,41 @@ export class Hero extends Entity {
         isSeismicShard: true
       }));
       if (this.isPlayer && addFloatingText) addFloatingText('🥌 LĂN ĐÁ NHAM THẠCH!', this.x, this.y - 35, '#f59e0b');
+    } else if (this.championId === 'support') {
+      // Lumina Star Orb: Fires exploding star sphere that stuns on impact
+      const damage = Math.round(cfg.damage[rankIdx] + (this.abilityPower || 0) * 0.60);
+      projectiles.push(new Projectile({
+        x: this.x + Math.cos(angle) * (this.radius + 10),
+        y: this.y + Math.sin(angle) * (this.radius + 10),
+        vx: Math.cos(angle) * cfg.speed,
+        vy: Math.sin(angle) * cfg.speed,
+        radius: cfg.radius || 18,
+        range: cfg.range || 1100,
+        team: this.team,
+        damage: damage,
+        color: '#ec4899',
+        owner: this,
+        isStarOrb: true
+      }));
+      // Lumina Passive: +25% movement speed for 2.5s
+      this.speedBoostTimer = 2.5;
+      this.recalculateStats();
+      if (this.isPlayer && addFloatingText) addFloatingText('🌟 TINH CẦU ÁNH SÁNG!', this.x, this.y - 35, '#f472b6');
+    } else if (this.championId === 'fighter') {
+      // Garen Decisive Strike: Cleanse slows, 40% speed boost for 3s, empowers next basic attack with silence
+      this.slowRatio = 0;
+      this.slowTimer = 0;
+      this.garenQTimer = 3.0;
+      this.speedBoostTimer = 3.0;
+      this.recalculateStats();
+      if (addFloatingText) addFloatingText('🗡️ ĐÒN QUYẾT ĐỊNH (+40% TỐC CHẠY)!', this.x, this.y - 45, '#388bfd');
     }
   }
 
-  castShield(addFloatingText = null) {
-    if (this.skillRanks.W <= 0 || this.isStasis || this.isReviving || this.stunTimer > 0 || this.knockupTimer > 0) {
+  castShield(addFloatingText = null, allHeroes = []) {
+    if (this.skillRanks.W <= 0 || this.isStasis || this.isReviving || this.stunTimer > 0 || this.knockupTimer > 0 || this.silenceTimer > 0) {
       if (this.isPlayer && addFloatingText && this.skillRanks.W <= 0) addFloatingText('⚠️ Chưa học chiêu W! Nhấn [+] để mở', this.x, this.y - 35, '#ff7b72');
+      if (this.isPlayer && addFloatingText && this.silenceTimer > 0) addFloatingText('🤐 Đang bị CÂM LẶNG!', this.x, this.y - 35, '#ff7b72');
       return;
     }
     const rankIdx = this.skillRanks.W - 1;
@@ -1356,12 +1443,32 @@ export class Hero extends Entity {
       this.armor += cfg.armorBoost[rankIdx];
       setTimeout(() => { this.recalculateStats(); }, 6000);
       if (addFloatingText) addFloatingText('💥 NẮM ĐẤM SẤM SÉT (ĐÁNH LAN)!', this.x, this.y - 45, '#f59e0b');
+    } else if (this.championId === 'support') {
+      // Lumina W: Celestial Aegis - Shields self and all allies within 600px
+      const shield = Math.round((cfg.shield[rankIdx] + (this.abilityPower || 0) * 0.50) * (this.hasSpiritVisage ? 1.25 : 1.0));
+      this.shield += shield;
+      for (let h of allHeroes) {
+        if (h.alive && h.team === this.team && h !== this && this.distanceTo(h) <= (cfg.radius || 600)) {
+          h.shield += shield;
+          if (addFloatingText) addFloatingText(`🛡️ KHIÊN TINH TÚ +${shield}!`, h.x, h.y - 35, '#ec4899');
+        }
+      }
+      this.speedBoostTimer = 2.5;
+      this.recalculateStats();
+      if (addFloatingText) addFloatingText(`🛡️ HỘ MỆNH TINH TÚ +${shield}!`, this.x, this.y - 35, '#ec4899');
+    } else if (this.championId === 'fighter') {
+      // Garen W: Courage - Shield + 40% damage reduction for 3.5s
+      const shield = Math.round((cfg.shield[rankIdx] + this.maxHp * 0.15) * (this.hasSpiritVisage ? 1.25 : 1.0));
+      this.shield += shield;
+      this.garenWTimer = 3.5;
+      if (addFloatingText) addFloatingText(`🔰 LÒNG DŨNG CẢM (GIẢM 40% DMG)!`, this.x, this.y - 45, '#388bfd');
     }
   }
 
-  castDash(targetX, targetY, rockWalls, addFloatingText = null, enemyHeroes = []) {
-    if (this.skillRanks.E <= 0 || this.isStasis || this.isReviving || this.stunTimer > 0 || this.knockupTimer > 0) {
+  castDash(targetX, targetY, rockWalls, addFloatingText = null, enemyHeroes = [], allyHeroes = []) {
+    if (this.skillRanks.E <= 0 || this.isStasis || this.isReviving || this.stunTimer > 0 || this.knockupTimer > 0 || this.silenceTimer > 0) {
       if (this.isPlayer && addFloatingText && this.skillRanks.E <= 0) addFloatingText('⚠️ Chưa học chiêu E! Nhấn [+] để mở', this.x, this.y - 35, '#ff7b72');
+      if (this.isPlayer && addFloatingText && this.silenceTimer > 0) addFloatingText('🤐 Đang bị CÂM LẶNG!', this.x, this.y - 35, '#ff7b72');
       return;
     }
     const rankIdx = this.skillRanks.E - 1;
@@ -1437,12 +1544,43 @@ export class Hero extends Entity {
         }
       }
       if (addFloatingText) addFloatingText(`🌋 DẬM ĐẤT CHẤN ĐỘNG!`, this.x, this.y - 35, '#d29922');
+    } else if (this.championId === 'support') {
+      // Lumina E: Fountain of Life - Heal self & lowest HP percentage ally within 450px
+      const healAmt = Math.round((cfg.heal[rankIdx] + (this.abilityPower || 0) * 0.55) * (this.hasSpiritVisage ? 1.25 : 1.0));
+      this.hp = Math.min(this.maxHp, this.hp + healAmt);
+      if (addFloatingText) addFloatingText(`💚 +${healAmt} HP`, this.x, this.y - 35, '#2ecc71');
+
+      let lowestAlly = null;
+      let minRatio = 1.0;
+      for (let a of (allyHeroes || [])) {
+        if (a.alive && a.team === this.team && a !== this && this.distanceTo(a) <= (cfg.range || 450)) {
+          const ratio = a.hp / a.maxHp;
+          if (ratio < minRatio) {
+            minRatio = ratio;
+            lowestAlly = a;
+          }
+        }
+      }
+      if (lowestAlly) {
+        lowestAlly.hp = Math.min(lowestAlly.maxHp, lowestAlly.hp + healAmt);
+        lowestAlly.armor += 30;
+        setTimeout(() => { if (lowestAlly.recalculateStats) lowestAlly.recalculateStats(); }, 3000);
+        if (addFloatingText) addFloatingText(`💚 +${healAmt} HP (HỒI MÁU)!`, lowestAlly.x, lowestAlly.y - 35, '#2ecc71');
+      }
+      this.speedBoostTimer = 2.5;
+      this.recalculateStats();
+    } else if (this.championId === 'fighter') {
+      // Garen E: Judgment Spin - starts 3s spinning blades
+      this.garenSpinTimer = 3.0;
+      this.garenSpinTickTimer = 0;
+      if (addFloatingText) addFloatingText('⚔️ PHÁN QUYẾT BÃO KIẾM!', this.x, this.y - 45, '#388bfd');
     }
   }
 
   castUltimate(heroes, towers, monsters, createClickWave = null, addFloatingText = null, onKill = null, projectiles = null) {
-    if (this.skillRanks.R <= 0 || this.isStasis || this.isReviving || this.stunTimer > 0 || this.knockupTimer > 0) {
+    if (this.skillRanks.R <= 0 || this.isStasis || this.isReviving || this.stunTimer > 0 || this.knockupTimer > 0 || this.silenceTimer > 0) {
       if (this.isPlayer && addFloatingText && this.skillRanks.R <= 0) addFloatingText('⚠️ Chưa học chiêu R (Cần cấp 4)!', this.x, this.y - 35, '#ff7b72');
+      if (this.isPlayer && addFloatingText && this.silenceTimer > 0) addFloatingText('🤐 Đang bị CÂM LẶNG!', this.x, this.y - 35, '#ff7b72');
       return;
     }
     const rankIdx = this.skillRanks.R - 1;
@@ -1485,6 +1623,51 @@ export class Hero extends Entity {
       }
       if (createClickWave) createClickWave(airborneEnemy.x, airborneEnemy.y, '#2ea043');
       if (addFloatingText) addFloatingText(`🌪️ TRĂN TRỐI TUYỆT KỸ (${damage})!`, this.x, this.y - 50, '#3fb950');
+      return;
+    }
+
+    if (this.championId === 'fighter') {
+      // Garen Demacian Justice: Targeted execution on lowest enemy hero in 500px
+      let bestTarget = null;
+      let lowestHp = 999999;
+      for (let h of heroes) {
+        if (h.alive && h.team !== this.team && this.distanceTo(h) <= (cfg.range || 500)) {
+          if (h.hp < lowestHp) {
+            lowestHp = h.hp;
+            bestTarget = h;
+          }
+        }
+      }
+      if (!bestTarget) {
+        if (this.isPlayer && addFloatingText) addFloatingText('⚠️ Cần chọn mục tiêu trong tầm 500px!', this.x, this.y - 45, '#ff7b72');
+        return;
+      }
+
+      this.mana -= manaCost;
+      this.cooldowns.R = cd;
+
+      const missingHp = Math.max(0, bestTarget.maxHp - bestTarget.hp);
+      const baseDmg = cfg.damage[rankIdx];
+      const trueDamage = Math.round(baseDmg + missingHp * 0.30);
+
+      bestTarget.hp -= trueDamage;
+      bestTarget.damageTaken = (bestTarget.damageTaken || 0) + trueDamage;
+      this.damageDealt = (this.damageDealt || 0) + trueDamage;
+
+      if (addFloatingText) {
+        addFloatingText(`🗡️ CÔNG LÝ DEMACIA: -${trueDamage} CHUẨN!`, bestTarget.x, bestTarget.y - 55, '#ffd700');
+      }
+      if (createClickWave) createClickWave(bestTarget.x, bestTarget.y, '#ffd700');
+
+      if (bestTarget.hp <= 0) {
+        bestTarget.hp = 0;
+        bestTarget.alive = false;
+        bestTarget.respawnTimer = 25;
+        this.kills = (this.kills || 0) + 1;
+        bestTarget.deaths = (bestTarget.deaths || 0) + 1;
+        if (onKill) onKill(bestTarget, this);
+      }
+      if (addFloatingText) addFloatingText('👑 DEMACIA!!!', this.x, this.y - 50, '#ffd700');
       return;
     }
 
@@ -1562,6 +1745,28 @@ export class Hero extends Entity {
       }
       if (createClickWave) createClickWave(this.x, this.y, '#f59e0b');
       if (addFloatingText) addFloatingText(`☄️ KHÔNG THỂ CẢN PHÁ (${damage})!`, this.x, this.y - 50, '#f59e0b');
+    } else if (this.championId === 'support') {
+      // Lumina Cosmic Blessing: 650px area silence, slow and damage
+      const damage = Math.round(cfg.damage[rankIdx] + (this.abilityPower || 0) * 0.70);
+      this.cosmicZone = {
+        x: this.x,
+        y: this.y,
+        radius: cfg.radius || 650,
+        timer: 4.0,
+        team: this.team,
+        damage: damage,
+        owner: this
+      };
+      for (let h of heroes) {
+        if (h.team !== this.team && h.alive && this.distanceTo(h) <= (cfg.radius || 650)) {
+          h.takeDamage(damage, this, addFloatingText);
+          h.silenceTimer = 1.5;
+          if (h.applySlow) h.applySlow(0.50, 2.5);
+          if (addFloatingText) addFloatingText('🤐 CÂM LẶNG (1.5s)!', h.x, h.y - 45, '#ec4899');
+        }
+      }
+      if (createClickWave) createClickWave(this.x, this.y, '#ec4899');
+      if (addFloatingText) addFloatingText(`🌌 KHÚC CA TINH VÂN!`, this.x, this.y - 50, '#ec4899');
     }
   }
 
@@ -1655,6 +1860,47 @@ export class Hero extends Entity {
       ctx.strokeStyle = 'rgba(255, 118, 117, 0.15)';
       ctx.lineWidth = 1.5;
       ctx.stroke();
+    }
+
+    // Lumina Cosmic Zone field
+    if (this.cosmicZone && this.cosmicZone.timer > 0) {
+      const zx = this.cosmicZone.x - camera.x;
+      const zy = this.cosmicZone.y - camera.y;
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(zx, zy, this.cosmicZone.radius, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(236, 72, 153, 0.12)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(244, 114, 182, 0.7)';
+      ctx.lineWidth = 3;
+      ctx.setLineDash([12, 8]);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Garen Judgment Spin vortex
+    if (this.garenSpinTimer > 0) {
+      ctx.save();
+      const spinAngle = Date.now() * 0.015;
+      ctx.translate(screenX, screenY);
+      ctx.rotate(spinAngle);
+      ctx.beginPath();
+      ctx.arc(0, 0, 80, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(255, 215, 0, 0.5)';
+      ctx.lineWidth = 6;
+      ctx.stroke();
+
+      for (let i = 0; i < 4; i++) {
+        ctx.rotate(Math.PI / 2);
+        ctx.beginPath();
+        ctx.moveTo(25, 0);
+        ctx.lineTo(80, 0);
+        ctx.strokeStyle = '#ffd700';
+        ctx.lineWidth = 4;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+      }
+      ctx.restore();
     }
 
     // Shield Aura
@@ -1751,7 +1997,7 @@ export class Hero extends Entity {
     ctx.fillStyle = '#f0f6fc';
     ctx.fillText(this.name, screenX, screenY - this.radius - 20);
 
-    // Crowd Control Label (Knockup / Stun)
+    // Crowd Control Label (Knockup / Stun / Silence)
     if (this.knockupTimer > 0) {
       ctx.font = 'bold 12px sans-serif';
       ctx.fillStyle = '#2ea043';
@@ -1762,6 +2008,11 @@ export class Hero extends Entity {
       ctx.fillStyle = '#58a6ff';
       ctx.textAlign = 'center';
       ctx.fillText('💫 CHOÁNG!', screenX, screenY - this.radius - 36);
+    } else if (this.silenceTimer > 0) {
+      ctx.font = 'bold 12px sans-serif';
+      ctx.fillStyle = '#ff7b72';
+      ctx.textAlign = 'center';
+      ctx.fillText('🤐 CÂM LẶNG!', screenX, screenY - this.radius - 36);
     }
 
     // Baron Aura Ring
